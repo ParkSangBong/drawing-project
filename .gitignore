@@ -1,0 +1,16 @@
+# node modules
+node_modules/
+backend-api/node_modules/
+frontend-web/node_modules/
+
+# python venv
+drawing-engine/venv/
+drawing-engine/__pycache__/
+
+# build outputs
+dist/
+.next/
+
+.env
+
+.DS_Store
