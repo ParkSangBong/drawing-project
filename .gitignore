@@ -1,6 +1,7 @@
 # node modules
 node_modules/
 backend-api/node_modules/
+backend-api/uploads/
 frontend-web/node_modules/
 
 # python venv
