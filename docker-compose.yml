@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # 데이터베이스 (MySQL 8.0)
+  db:
+    image: mysql:8.0
+    container_name: dada-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mom_drawing_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # 메시지 큐 (Redis) - 비동기 작업을 위해 미리 세팅
+  redis:
+    image: redis:latest
+    container_name: dada-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  db_data:
