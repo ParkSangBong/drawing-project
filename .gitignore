@@ -15,3 +15,5 @@ dist/
 .env
 
 .DS_Store
+
+.mcp*
