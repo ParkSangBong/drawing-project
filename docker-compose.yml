@@ -4,11 +4,11 @@ services:
   # 데이터베이스 (MySQL 8.0)
   db:
     image: mysql:8.0
-    container_name: dada-mysql
+    container_name: drawing-service-mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: mom_drawing_db
+      MYSQL_DATABASE: drawing_service_db
       MYSQL_USER: user
       MYSQL_PASSWORD: user_password
     ports:
@@ -19,7 +19,7 @@ services:
   # 메시지 큐 (Redis) - 비동기 작업을 위해 미리 세팅
   redis:
     image: redis:latest
-    container_name: dada-redis
+    container_name: drawing-service-redis
     ports:
       - "6379:6379"
 
