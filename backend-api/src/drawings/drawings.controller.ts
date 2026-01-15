@@ -31,10 +31,16 @@ export class DrawingsController {
       }),
     }),
   )
+  
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    // file.originalname: 사용자가 올린 원래 이름 (한글 포함)
-    // file.path: 서버에 저장된 UUID 경로 (한글 깨짐 없음)
-    return this.drawingsService.create(file.originalname, file.path);
+    // [추가] 한글 파일명 깨짐 방지 로직
+    // 오리지널 이름을 Buffer를 이용해 latin1에서 utf8로 다시 인코딩합니다.
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    
+    console.log('디코딩된 파일명:', originalName); // 터미널에서 한글이 잘 나오는지 확인용
+
+    // 수정된 originalName을 서비스로 전달합니다.
+    return this.drawingsService.create(originalName, file.path);
   }
 
   @Get()
