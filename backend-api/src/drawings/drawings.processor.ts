@@ -13,7 +13,7 @@ export class DrawingResultsProcessor extends WorkerHost {
   async process(job: Job<any>): Promise<any> {
     const { drawingId, status } = job.data;
 
-    console.log(`📩 파이썬으로부터 결과 수신: ID ${drawingId} -> ${status}`);
+    console.log(`📩 From Python RESULT : ID ${drawingId} -> ${status}`);
 
     // DB 상태 업데이트
     await this.drizzle.db

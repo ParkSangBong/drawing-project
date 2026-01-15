@@ -15,6 +15,7 @@ export class DrizzleService implements OnModuleInit {
       user: 'root',
       password: 'root_password',
       database: 'drawing_service_db',
+      charset: 'utf8mb4',
     });
 
     // 2. Drizzle 인스턴스 초기화
