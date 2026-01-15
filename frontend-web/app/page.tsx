@@ -61,6 +61,15 @@ export default function Home() {
               <td>{d.fileName}</td>
               <td style={{ fontWeight: 'bold', color: d.status === 'COMPLETED' ? 'green' : 'orange' }}>
                 {d.status}
+                {d.status === 'COMPLETED' && (
+                  <a 
+                    href={`http://localhost:3000/${d.originalUrl.replace('.jpeg', '.dxf').replace('.png', '.dxf')}`} 
+                    download 
+                    style={{ marginLeft: '10px', color: 'blue', fontSize: '0.8rem' }}
+                  >
+                    [DXF 다운로드]
+                  </a>
+                )}
               </td>
               <td>{new Date(d.createdAt).toLocaleString()}</td>
             </tr>
