@@ -36,6 +36,27 @@ async def process_drawing(job, job_id):
         doc = ezdxf.new(dxfversion="R2010")
         msp = doc.modelspace()
 
+        # for cnt in contours:
+        #     # 1. 면적 필터링 (너무 작은 점/먼지 제거)
+        #     if cv2.contourArea(cnt) < 50: # 기준을 조금 더 높였습니다
+        #         continue
+            
+        #     # 2. 선 팽팽하게 펴기 (Douglas-Peucker 알고리즘)
+        #     # epsilon값이 커질수록 선이 더 단순해지고 직선화됩니다.
+        #     epsilon = 0.01 * cv2.arcLength(cnt, True) 
+        #     approx = cv2.approxPolyDP(cnt, epsilon, True)
+
+        #     # 3. DXF에 그리기
+        #     points = approx.reshape(-1, 2)
+        #     for i in range(len(points) - 1):
+        #         p1 = (float(points[i][0]), float(-points[i][1]))
+        #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
+        #         msp.add_line(p1, p2)
+            
+        #     # 마지막 점과 첫 점을 이어주기 (닫힌 도형일 경우)
+        #     msp.add_line((float(points[-1][0]), float(-points[-1][1])), 
+        #                  (float(points[0][0]), float(-points[0][1])))
+
         for cnt in contours:
             # 너무 작은 점들은 노이즈로 판단하고 무시 (면적 기준)
             if cv2.contourArea(cnt) < 10:
