@@ -6,6 +6,7 @@ import axios from 'axios';
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [drawings, setDrawings] = useState([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // 1. 도면 목록 불러오기
   const fetchDrawings = async () => {
@@ -19,6 +20,18 @@ export default function Home() {
     const timer = setInterval(fetchDrawings, 3000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0] || null;
+    setFile(selectedFile);
+
+    if (selectedFile) {
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
 
   // 2. 도면 업로드 함수
   const handleUpload = async () => {
@@ -105,31 +118,58 @@ export default function Home() {
         padding: '2rem', 
         borderRadius: '12px', 
         backgroundColor: '#1a1a1a',
-        textAlign: 'center' // 중앙 정렬
+        textAlign: 'center'
       }}>
-        <h3 style={{ marginTop: 0, color: '#ffffff', marginBottom: '1rem' }}>새 도면 업로드</h3>
+        <h3 style={{ marginTop: 0, color: '#ffffff', marginBottom: '1.5rem' }}>새 도면 업로드</h3>
         
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-          {/* 숨겨진 실제 input */}
+          
+          {/* 📸 이미지 미리보기 영역 추가 */}
+          <div style={{ 
+            width: '100%', 
+            maxWidth: '300px', 
+            height: '180px', 
+            backgroundColor: '#222', 
+            borderRadius: '8px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            overflow: 'hidden',
+            border: '1px solid #333',
+            marginBottom: '10px'
+          }}>
+            {previewUrl ? (
+              <img 
+                src={previewUrl} 
+                alt="미리보기" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+              />
+            ) : (
+              <span style={{ color: '#666', fontSize: '0.9rem' }}>이미지 미리보기</span>
+            )}
+          </div>
+
+          {/* 숨겨진 실제 input (onChange에서 handleFileChange 호출) */}
           <input 
             type="file" 
             id="file-upload"
             style={{ display: 'none' }} 
-            onChange={(e) => setFile(e.target.files?.[0] || null)} 
+            onChange={handleFileChange} 
           />
           
           {/* 디자인된 가짜 버튼 (label) */}
           <label htmlFor="file-upload" style={{
             padding: '10px 20px',
-            backgroundColor: '#444',
+            backgroundColor: '#333',
             color: 'white',
             borderRadius: '6px',
             cursor: 'pointer',
-            border: '1px dashed #666',
+            border: '1px dashed #555',
             width: '100%',
-            maxWidth: '300px'
+            maxWidth: '300px',
+            fontSize: '0.9rem'
           }}>
-            {file ? `선택됨: ${file.name}` : "📁 도면 파일 선택 (또는 여기로 드래그)"}
+            {file ? `📄 ${file.name}` : "📁 도면 파일 선택"}
           </label>
 
           <button 
@@ -137,14 +177,16 @@ export default function Home() {
             disabled={!file}
             style={{ 
               padding: '12px 30px', 
-              backgroundColor: file ? '#3498db' : '#555', 
-              color: 'white', 
+              backgroundColor: file ? '#3498db' : '#444', 
+              color: file ? 'white' : '#888', 
               border: 'none', 
               borderRadius: '6px',
               cursor: file ? 'pointer' : 'not-allowed',
               fontWeight: 'bold',
               fontSize: '1rem',
-              transition: '0.3s'
+              transition: '0.3s',
+              width: '100%',
+              maxWidth: '300px'
             }}
           >
             변환 시작하기
