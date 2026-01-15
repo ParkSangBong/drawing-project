@@ -11,7 +11,7 @@ import { DrawingsGateway } from './drawings.gateway';
     BullModule.registerQueue({ name: 'drawing-results' }), // 결과 큐 등록
   ],
   controllers: [DrawingsController],
-  providers: [DrawingsService, DrawingResultsProcessor], // Processor 추가
+  providers: [DrawingsService, DrawingResultsProcessor, DrawingsGateway], // Processor 추가
   exports: [DrawingsGateway],
 })
 export class DrawingsModule {}

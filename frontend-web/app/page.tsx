@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -14,11 +15,29 @@ export default function Home() {
     setDrawings(res.data);
   };
 
+  // useEffect(() => {
+  //   fetchDrawings();
+  //   // 3초마다 상태를 새로고침 (실시간 느낌)
+  //   const timer = setInterval(fetchDrawings, 3000);
+  //   return () => clearInterval(timer);
+  // }, []);
+
   useEffect(() => {
-    fetchDrawings();
-    // 3초마다 상태를 새로고침 (실시간 느낌)
-    const timer = setInterval(fetchDrawings, 3000);
-    return () => clearInterval(timer);
+    fetchDrawings(); // 처음 들어왔을 때 목록 가져오기
+
+    // 2. 웹소켓 연결 (백엔드 주소)
+    const socket = io('http://localhost:3000');
+
+    // 3. 서버에서 'drawingUpdated'라는 신호가 오면 실행
+    socket.on('drawingUpdated', (data) => {
+      console.log('실시간 업데이트 수신:', data);
+      fetchDrawings(); // 목록을 새로고침합니다!
+    });
+
+    // 4. Cleanup: 페이지 나갈 때 연결 끊기 (폴링 타이머 제거됨!)
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,7 +60,7 @@ export default function Home() {
 
     try {
       await axios.post('http://localhost:3000/drawings/upload', formData);
-      alert('도면이 접수되었습니다!');
+      // alert('도면이 접수되었습니다!');
       fetchDrawings();
     } catch (e) {
       console.error('업로드 실패', e);

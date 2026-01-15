@@ -3,12 +3,15 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { DrizzleService } from '../db/drizzle/drizzle.service';
 import { drawings } from '../db/schema';
+import { DrawingsGateway } from './drawings.gateway';
+import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class DrawingsService {
   constructor(
     private readonly drizzle: DrizzleService,
     @InjectQueue('drawing-conversion') private conversionQueue: Queue, // 큐 주입
+    private readonly drawingsGateway: DrawingsGateway,
   ) {}
 
   // async create(fileName: string, filePath: string) {
@@ -31,6 +34,20 @@ export class DrawingsService {
   //     drawingId: result.insertId 
   //   };
   // }
+
+  async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED') {
+    console.log(`[Status Update] ID: ${id} -> ${status}`);
+
+    await this.drizzle.db
+      .update(drawings)
+      .set({ status: status })
+      .where(eq(drawings.id, id));
+
+    if (status === 'COMPLETED') {
+      console.log(`[WebSocket] ${id}번 도면 변환 완료 신호 발송!`);
+      this.drawingsGateway.sendUpdateNotification(id);
+    }
+  }
 
   async create(fileName: string, filePath: string) {
     // 1. DB 저장
