@@ -13,6 +13,8 @@ result_queue = Queue("drawing-results", {
 # 실제 이미지를 변환하는 로직이 들어갈 함수
 async def process_drawing(job, job_id):
     print(f"\n[🔥 변환 시작] Job ID: {job_id}")
+    time.sleep(5)
+    print(f"\n[🔥🔥🔥🔥🔥 변환 시작] Job ID: {job_id}")
     data = job.data
     input_path = f"../backend-api/{data['filePath']}" # NestJS가 저장한 경로
     output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
