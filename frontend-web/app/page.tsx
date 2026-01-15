@@ -68,12 +68,31 @@ export default function Home() {
         }
         table {
           border-collapse: collapse;
-          margin-top: 1rem;
+          width: 100%;
+          background-color: #1a1a1a;
+          border: 1px solid #333;
+          border-radius: 12px;
+          overflow: hidden; /* 테두리 둥글게 유지 */
+          margin-top: 2rem;
         }
+
         th {
-          background-color: #f8f9fa;
-          padding: 12px;
-          border-bottom: 2px solid #dee2e6;
+          background-color: #2c2c2c; /* 헤더 배경을 어둡게 */
+          color: #e0e0e0;           /* 글자는 밝게 */
+          padding: 16px;
+          border-bottom: 2px solid #444;
+          font-size: 0.9rem;
+          font-weight: 600;
+        }
+
+        td {
+          padding: 14px;
+          border-bottom: 1px solid #2a2a2a;
+          color: #ccc;
+        }
+
+        tr:hover {
+          background-color: #222; /* 마우스 올렸을 때 강조 효과 */
         }
       `}</style>
 
