@@ -21,19 +21,32 @@ export default function Home() {
   const [editingId, setEditingId] = useState<number | null>(null); // 현재 편집 중인 도면 ID
 
   // b. 슬라이더 값이 바뀔 때마다 서버에 알리는 함수 (Socket 이용)
-  const emitAdjust = (newBlockSize: number, newCValue: number) => {
-    // 편집 중인 아이디가 없으면 일단 24번(테스트용)으로 고정하거나 로직 추가
-    const currentId = editingId || 24; 
+  // const emitAdjust = (newBlockSize: number, newCValue: number) => {
+  //   // 편집 중인 아이디가 없으면 일단 24번(테스트용)으로 고정하거나 로직 추가
+  //   const currentId = editingId || 24; 
+
+  //   if (socket) {
+  //     console.log("📤 서버로 파라미터 전송:", { drawingId: currentId, blockSize: newBlockSize, cValue: newCValue });
+      
+  //     // 서버에 'adjustParameters'라는 이름으로 신호를 보냅니다.
+  //     socket.emit('adjustParameters', {
+  //       drawingId: currentId,
+  //       blockSize: newBlockSize,
+  //       cValue: newCValue,
+  //       mode: 'PREVIEW'
+  //     });
+  //   }
+  // };
+  // 1. emitAdjust 함수 수정 (mode 인자 추가 및 안정성 강화)
+  const emitAdjust = (newBlockSize: number, newCValue: number, mode: string = 'PREVIEW') => {
+    if (!editingId && mode === 'PREVIEW') return; // ID 없으면 무시
 
     if (socket) {
-      console.log("📤 서버로 파라미터 전송:", { drawingId: currentId, blockSize: newBlockSize, cValue: newCValue });
-      
-      // 서버에 'adjustParameters'라는 이름으로 신호를 보냅니다.
       socket.emit('adjustParameters', {
-        drawingId: currentId,
+        drawingId: editingId,
         blockSize: newBlockSize,
         cValue: newCValue,
-        mode: 'PREVIEW'
+        mode: mode
       });
     }
   };
@@ -50,6 +63,20 @@ export default function Home() {
   //   const timer = setInterval(fetchDrawings, 3000);
   //   return () => clearInterval(timer);
   // }, []);
+
+  const handleFinalSave = () => {
+    if (!editingId || !socket) return;
+    
+    alert('최종 CAD 변환을 시작합니다. 잠시만 기다려주세요!');
+    
+    // 서버에 'FINAL' 모드로 요청 보냄
+    socket.emit('adjustParameters', {
+      drawingId: editingId,
+      blockSize: blockSize,
+      cValue: cValue,
+      mode: 'FINAL' // 이제 PREVIEW가 아닌 FINAL입니다!
+    });
+  };
 
   useEffect(() => {
     fetchDrawings(); // 처음 들어왔을 때 목록 가져오기
@@ -96,15 +123,66 @@ export default function Home() {
   };
 
   // 2. 도면 업로드 함수
+  // const handleUpload = async () => {
+  //   if (!file) return;
+  //   const formData = new FormData();
+  //   formData.append('file', file);
+
+  //   try {
+  //     await axios.post('http://localhost:3000/drawings/upload', formData);
+  //     // alert('도면이 접수되었습니다!');
+  //     fetchDrawings();
+  //   } catch (e) {
+  //     console.error('업로드 실패', e);
+  //   }
+  // };
+  // const handleUpload = async () => {
+  //   if (!file) return;
+  //   const formData = new FormData();
+  //   formData.append('file', file);
+  
+  //   try {
+  //     const res = await axios.post('http://localhost:3000/drawings/upload', formData);
+      
+  //     // 백엔드 응답에서 받은 새 ID (DrawingsService에서 보낸 drawingId)
+  //     const newId = res.data.drawingId; 
+      
+  //     // ✅ 새 도면을 즉시 편집 대상으로 설정!
+  //     setEditingId(newId);
+  //     setProcessedPreview(null);
+      
+  //     fetchDrawings();
+  //   } catch (e) {
+  //     console.error('업로드 실패', e);
+  //   }
+  // };
+  // 2. handleUpload 함수 수정 (업로드 성공 즉시 미리보기 신호 쏘기)
   const handleUpload = async () => {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      await axios.post('http://localhost:3000/drawings/upload', formData);
-      // alert('도면이 접수되었습니다!');
+      const res = await axios.post('http://localhost:3000/drawings/upload', formData);
+      const newId = res.data.drawingId; 
+      
+      setEditingId(newId);
+      setProcessedPreview(null);
       fetchDrawings();
+
+      // 🚀 추가: 업로드 완료 직후 서버에 미리보기 생성 신호를 보냅니다.
+      // 약간의 딜레이를 주어 DB 저장이 확실히 완료된 후 요청하게 합니다.
+      setTimeout(() => {
+        if (socket) {
+          socket.emit('adjustParameters', {
+            drawingId: newId,
+            blockSize: blockSize,
+            cValue: cValue,
+            mode: 'PREVIEW'
+          });
+        }
+      }, 500);
+
     } catch (e) {
       console.error('업로드 실패', e);
     }
@@ -118,12 +196,20 @@ export default function Home() {
     }
   };
 
+  // const getDxfUrl = (originalUrl: string) => {
+  //   // 확장자만 .dxf로 교체하는 함수
+  //   const lastDotIndex = originalUrl.lastIndexOf('.');
+  //   const basePath = originalUrl.substring(0, lastDotIndex);
+  //   return `http://localhost:3000/${basePath}.dxf`;
+  // };
   const getDxfUrl = (originalUrl: string) => {
-    // 확장자만 .dxf로 교체하는 함수
     const lastDotIndex = originalUrl.lastIndexOf('.');
     const basePath = originalUrl.substring(0, lastDotIndex);
-    return `http://localhost:3000/${basePath}.dxf`;
+    
+    // 🚀 파일 경로 뒤에 현재 시간을 붙여서 캐시를 강제로 무효화합니다.
+    return `http://localhost:3000/${basePath}.dxf?t=${Date.now()}`;
   };
+
 
   return (
     <main style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
@@ -282,7 +368,7 @@ export default function Home() {
           ) : (
             <div style={{ textAlign: 'center', color: '#666' }}>
               <p>슬라이더를 조작하면 보정된 이미지가 여기에 나타납니다.</p>
-              <p style={{ fontSize: '0.8rem' }}>(현재 ID: 24 도면 편집 중)</p>
+              <p style={{ fontSize: '0.8rem' }}>(현재 ID: {editingId || '선택 안 됨'})</p>
             </div>
           )}
         </div>
@@ -322,6 +408,23 @@ export default function Home() {
             />
           </div>
         </div>
+
+        <div className="mt-6 flex justify-end">
+          <button 
+            onClick={handleFinalSave}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#2ecc71', // 초록색 (저장/완료 의미)
+              color: 'white',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              border: 'none'
+            }}
+          >
+            💾 설정값으로 최종 DXF 저장
+          </button>
+        </div>
       </div>
 
       <table style={{ width: '100%', textAlign: 'center' }}>
@@ -359,23 +462,38 @@ export default function Home() {
                   </span>
                 </td>
                 <td style={{ padding: '12px' }}>
-                  {d.status === 'COMPLETED' ? (
-                    <a href={getDxfUrl(d.originalUrl)} download style={{
-                      color: 'white',
-                      backgroundColor: '#3498db',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      textDecoration: 'none',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap', // [중요] 글자가 길어도 한 줄로 유지
-                      display: 'inline-block'
-                    }}>
-                      CAD 파일 다운로드
-                    </a>
-                  ) : (
-                    <span style={{ color: '#666' }}>처리 대기 중</span>
-                  )}
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center' }}>
+                    {/* 다운로드 버튼 */}
+                    {d.status === 'COMPLETED' ? (
+                      <a href={getDxfUrl(d.originalUrl)} download style={{
+                        color: 'white', backgroundColor: '#3498db', padding: '8px 16px', borderRadius: '4px',
+                        textDecoration: 'none', fontSize: '0.85rem', fontWeight: 'bold'
+                      }}>
+                        CAD 파일 다운로드
+                      </a>
+                    ) : (
+                      <span style={{ color: '#666', fontSize: '0.85rem' }}>처리 대기 중</span>
+                    )}
+
+                    {/* 🔥 보정 편집 버튼 (여기가 핵심!) */}
+                    <button 
+                      onClick={() => {
+                        console.log(`🎯 편집 대상 변경: ${d.id}번 도면`); // 확인용 로그
+                        setEditingId(d.id); // 편집 타겟 변경
+                        setProcessedPreview(null); // 이전 미리보기 잔상 지우기
+                        
+                        // 버튼 누르자마자 서버에 현재 슬라이더 값으로 미리보기 요청 (선택 사항)
+                        emitAdjust(blockSize, cValue); 
+                      }}
+                      style={{
+                        padding: '8px 16px', backgroundColor: '#f39c12', color: 'white',
+                        borderRadius: '4px', border: 'none', cursor: 'pointer',
+                        fontSize: '0.85rem', fontWeight: 'bold'
+                      }}
+                    >
+                      보정 편집
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
