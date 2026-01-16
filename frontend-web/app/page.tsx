@@ -28,6 +28,11 @@ export default function Home() {
     // 2. 웹소켓 연결 (백엔드 주소)
     const socket = io('http://localhost:3000');
 
+    // [추가] 연결 성공 시 콘솔에 출력
+    socket.on('connect', () => {
+      console.log('✅ 서버와 소켓 연결 성공! ID:', socket.id);
+    });
+
     // 3. 서버에서 'drawingUpdated'라는 신호가 오면 실행
     socket.on('drawingUpdated', (data) => {
       console.log('실시간 업데이트 수신:', data);
