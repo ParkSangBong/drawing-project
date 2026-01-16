@@ -18,7 +18,7 @@ async def process_drawing(job, job_id):
     # block_size: 격자 제거 범위, c_value: 선명도 감도
     block_size = data.get('blockSize', 11) 
     c_value = data.get('cValue', 2)
-    mode = data.get('mode', 'FINAL') # PREVIEW 또는 FINAL
+    mode = data.get('mode', 'FINAL').upper() # PREVIEW 또는 FINAL
 
     try:
         img = cv2.imread(input_path)
@@ -53,8 +53,35 @@ async def process_drawing(job, job_id):
             print(f"🖼️ 미리보기 생성 완료 (BS:{block_size}, C:{c_value})")
 
         else:
-            # --- 최종 변환 모드: DXF 생성 (기존 로직) ---
+            # # --- 최종 변환 모드: DXF 생성 (기존 로직) ---
+            # output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
+            # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # doc = ezdxf.new(dxfversion="R2010")
+            # msp = doc.modelspace()
+
+            # for cnt in contours:
+            #     if cv2.contourArea(cnt) < 10: continue
+            #     points = cnt.reshape(-1, 2)
+            #     for i in range(len(points) - 1):
+            #         p1 = (float(points[i][0]), float(-points[i][1]))
+            #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
+            #         msp.add_line(p1, p2)
+
+            # doc.saveas(output_dxf_path)
+            # await result_queue.add("completed", {
+            #     "drawingId": data['drawingId'],
+            #     "status": "COMPLETED",
+            #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
+            # })
+            # print(f"✨ 최종 DXF 생성 완료")
+            # --- 최종 변환 모드: DXF 생성 ---
             output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
+            # output_dxf_path = input_path.rsplit('.', 1)[0] + "_fixed.dxf"
+            # 확인 로그 추가 (실제 어디에 저장되는지 터미널에서 보세요)
+            print(f"📍 실제 저장 경로: {os.path.abspath(output_dxf_path)}")
+            # [중요] 여기서 사용되는 'thresh'는 위에서 슬라이더 값(block_size, c_value)이 
+            # 적용되어 계산된 변수입니다. 따라서 이론적으로는 현재 잘 짜여진 상태입니다!
             contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             
             doc = ezdxf.new(dxfversion="R2010")
@@ -68,13 +95,15 @@ async def process_drawing(job, job_id):
                     p2 = (float(points[i+1][0]), float(-points[i+1][1]))
                     msp.add_line(p1, p2)
 
-            doc.saveas(output_dxf_path)
+            doc.saveas(output_dxf_path) # 👈 이 코드가 실행되면 기존 DXF가 보정된 값으로 덮어씌워집니다.
+            
+            # NestJS로 완료 신호 보냄
             await result_queue.add("completed", {
                 "drawingId": data['drawingId'],
                 "status": "COMPLETED",
                 "resultUrl": output_dxf_path.replace("../backend-api/", "")
             })
-            print(f"✨ 최종 DXF 생성 완료")
+            print(f"✨ 최종 DXF 생성 완료 (보정값 적용됨)")
 
     except Exception as e:
         print(f"❌ 에러: {e}")
