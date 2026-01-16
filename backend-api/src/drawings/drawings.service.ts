@@ -35,7 +35,7 @@ export class DrawingsService {
   //   };
   // }
 
-  async requestPreview(id: number, blockSize: number, cValue: number) {
+  async requestPreview(id: number, blockSize: number, cValue: number, mode: string = 'PREVIEW') {
     // DB에서 원본 파일 경로를 가져와야 파이썬이 처리할 수 있습니다.
     const drawing = await this.drizzle.db
       .select()
@@ -51,9 +51,9 @@ export class DrawingsService {
       filePath: drawing.originalUrl,
       blockSize: blockSize,
       cValue: cValue,
-      mode: 'PREVIEW' // 핵심: 파이썬이 빠르게 이미지만 만들게 함
+      mode: mode // 핵심: 파이썬이 빠르게 이미지만 만들게 함
     }, { 
-      jobId: `preview-${id}`, // 동일 도면의 미리보기 요청은 덮어쓰거나 관리하기 위함
+      jobId: `${mode}-${id}-${Date.now()}`, // 동일 도면의 미리보기 요청은 덮어쓰거나 관리하기 위함
       removeOnComplete: true 
     });
   }

@@ -47,6 +47,7 @@ import { forwardRef, Inject } from '@nestjs/common';
         data.drawingId,
         data.blockSize,
         data.cValue,
+        data.mode
       );
     }
   }
