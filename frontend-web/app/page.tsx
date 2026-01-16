@@ -5,9 +5,38 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 
 export default function Home() {
+  // 소켓 객체를 담을 상태 (재연결 방지용)
+  const [socket, setSocket] = useState<any>(null);
+
+  // 1. 미리보기 이미지 경로를 담을 상태 추가
+  const [processedPreview, setProcessedPreview] = useState<string | null>(null);
+
   const [file, setFile] = useState<File | null>(null);
   const [drawings, setDrawings] = useState([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // a. 슬라이더 상태 관리
+  const [blockSize, setBlockSize] = useState(11);
+  const [cValue, setCValue] = useState(2);
+  const [editingId, setEditingId] = useState<number | null>(null); // 현재 편집 중인 도면 ID
+
+  // b. 슬라이더 값이 바뀔 때마다 서버에 알리는 함수 (Socket 이용)
+  const emitAdjust = (newBlockSize: number, newCValue: number) => {
+    // 편집 중인 아이디가 없으면 일단 24번(테스트용)으로 고정하거나 로직 추가
+    const currentId = editingId || 24; 
+
+    if (socket) {
+      console.log("📤 서버로 파라미터 전송:", { drawingId: currentId, blockSize: newBlockSize, cValue: newCValue });
+      
+      // 서버에 'adjustParameters'라는 이름으로 신호를 보냅니다.
+      socket.emit('adjustParameters', {
+        drawingId: currentId,
+        blockSize: newBlockSize,
+        cValue: newCValue,
+        mode: 'PREVIEW'
+      });
+    }
+  };
 
   // 1. 도면 목록 불러오기
   const fetchDrawings = async () => {
@@ -26,22 +55,31 @@ export default function Home() {
     fetchDrawings(); // 처음 들어왔을 때 목록 가져오기
 
     // 2. 웹소켓 연결 (백엔드 주소)
-    const socket = io('http://localhost:3000');
+    const newSocket = io('http://localhost:3000');
+    setSocket(newSocket);
 
     // [추가] 연결 성공 시 콘솔에 출력
-    socket.on('connect', () => {
-      console.log('✅ 서버와 소켓 연결 성공! ID:', socket.id);
+    newSocket.on('connect', () => {
+      console.log('✅ 서버와 소켓 연결 성공! ID:', newSocket.id);
     });
 
     // 3. 서버에서 'drawingUpdated'라는 신호가 오면 실행
-    socket.on('drawingUpdated', (data) => {
+    newSocket.on('drawingUpdated', (data) => {
       console.log('실시간 업데이트 수신:', data);
       fetchDrawings(); // 목록을 새로고침합니다!
     });
 
+    // [추가 예정] 서버가 "미리보기 이미지 다 됐어!"라고 할 때
+    newSocket.on('previewReady', (data) => {
+      console.log('🖼️ 미리보기 업데이트!', data.previewUrl);
+      // data.previewUrl이 "uploads/filename_preview.png" 형태라면 앞에 도메인을 붙여줍니다.
+      const fullUrl = `http://localhost:3000/${data.previewUrl}?t=${Date.now()}`;
+      setProcessedPreview(fullUrl);
+    });
+
     // 4. Cleanup: 페이지 나갈 때 연결 끊기 (폴링 타이머 제거됨!)
     return () => {
-      socket.disconnect();
+      newSocket.disconnect();
     };
   }, []);
 
@@ -215,6 +253,74 @@ export default function Home() {
           >
             변환 시작하기
           </button>
+        </div>
+      </div>
+
+      {/* 3. 슬라이더 편집 패키지 (UI) */}
+      <div className="mt-8 p-6 bg-gray-900 rounded-xl border border-gray-700">
+        <h2 className="text-xl font-bold mb-4 text-white">🛠️ 실시간 도면 보정 편집기</h2>
+        
+        {/* [추가] 실시간 보정 결과 출력 영역 */}
+        <div style={{ 
+          width: '100%', 
+          height: '400px', // 좀 더 크게 봅니다
+          backgroundColor: '#000', 
+          borderRadius: '12px', 
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '2px solid #444',
+          overflow: 'hidden'
+        }}>
+          {processedPreview ? (
+            <img 
+              src={processedPreview} 
+              alt="보정 결과" 
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+            />
+          ) : (
+            <div style={{ textAlign: 'center', color: '#666' }}>
+              <p>슬라이더를 조작하면 보정된 이미지가 여기에 나타납니다.</p>
+              <p style={{ fontSize: '0.8rem' }}>(현재 ID: 24 도면 편집 중)</p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          {/* 격자 제거 (Block Size) 슬라이더 */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">
+              격자/노이즈 제거 강도 (Block Size): {blockSize}
+            </label>
+            <input 
+              type="range" min="3" max="99" step="2" 
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              value={blockSize}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setBlockSize(val);
+                emitAdjust(val, cValue);
+              }}
+            />
+          </div>
+
+          {/* 선명도 (C Value) 슬라이더 */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">
+              선명도 세부 조절 (C Value): {cValue}
+            </label>
+            <input 
+              type="range" min="0" max="20" 
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+              value={cValue}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setCValue(val);
+                emitAdjust(blockSize, val);
+              }}
+            />
+          </div>
         </div>
       </div>
 
