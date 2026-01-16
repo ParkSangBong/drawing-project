@@ -35,6 +35,29 @@ export class DrawingsService {
   //   };
   // }
 
+  async requestPreview(id: number, blockSize: number, cValue: number) {
+    // DB에서 원본 파일 경로를 가져와야 파이썬이 처리할 수 있습니다.
+    const drawing = await this.drizzle.db
+      .select()
+      .from(drawings)
+      .where(eq(drawings.id, id))
+      .then(res => res[0]);
+  
+    if (!drawing) return;
+  
+    // 파이썬 엔진(BullMQ)에 작업 추가
+    await this.conversionQueue.add('convert', {
+      drawingId: id,
+      filePath: drawing.originalUrl,
+      blockSize: blockSize,
+      cValue: cValue,
+      mode: 'PREVIEW' // 핵심: 파이썬이 빠르게 이미지만 만들게 함
+    }, { 
+      jobId: `preview-${id}`, // 동일 도면의 미리보기 요청은 덮어쓰거나 관리하기 위함
+      removeOnComplete: true 
+    });
+  }
+
   async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED') {
     console.log(`[Status Update] ID: ${id} -> ${status}`);
 
