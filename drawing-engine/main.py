@@ -75,35 +75,81 @@ async def process_drawing(job, job_id):
             #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
             # })
             # print(f"✨ 최종 DXF 생성 완료")
+
+            #
+            # --- 최종 변환 모드: DXF 생성 ---
+            # output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
+            # # output_dxf_path = input_path.rsplit('.', 1)[0] + "_fixed.dxf"
+            # # 확인 로그 추가 (실제 어디에 저장되는지 터미널에서 보세요)
+            # print(f"📍 실제 저장 경로: {os.path.abspath(output_dxf_path)}")
+            # # [중요] 여기서 사용되는 'thresh'는 위에서 슬라이더 값(block_size, c_value)이 
+            # # 적용되어 계산된 변수입니다. 따라서 이론적으로는 현재 잘 짜여진 상태입니다!
+            # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # doc = ezdxf.new(dxfversion="R2010")
+            # msp = doc.modelspace()
+
+            # for cnt in contours:
+            #     if cv2.contourArea(cnt) < 10: continue
+            #     points = cnt.reshape(-1, 2)
+            #     for i in range(len(points) - 1):
+            #         p1 = (float(points[i][0]), float(-points[i][1]))
+            #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
+            #         msp.add_line(p1, p2)
+
+            # doc.saveas(output_dxf_path) # 👈 이 코드가 실행되면 기존 DXF가 보정된 값으로 덮어씌워집니다.
+            
+            # # NestJS로 완료 신호 보냄
+            # await result_queue.add("completed", {
+            #     "drawingId": data['drawingId'],
+            #     "status": "COMPLETED",
+            #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
+            # })
+            # print(f"✨ 최종 DXF 생성 완료 (보정값 적용됨)")
+
             # --- 최종 변환 모드: DXF 생성 ---
             output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
-            # output_dxf_path = input_path.rsplit('.', 1)[0] + "_fixed.dxf"
-            # 확인 로그 추가 (실제 어디에 저장되는지 터미널에서 보세요)
-            print(f"📍 실제 저장 경로: {os.path.abspath(output_dxf_path)}")
-            # [중요] 여기서 사용되는 'thresh'는 위에서 슬라이더 값(block_size, c_value)이 
-            # 적용되어 계산된 변수입니다. 따라서 이론적으로는 현재 잘 짜여진 상태입니다!
+            
+            # 1. 윤곽선 추출
             contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             
             doc = ezdxf.new(dxfversion="R2010")
             msp = doc.modelspace()
 
             for cnt in contours:
-                if cv2.contourArea(cnt) < 10: continue
-                points = cnt.reshape(-1, 2)
+                # 🚀 [개선 1] 면적 필터링 강화
+                # 너무 작은 점(먼지)은 무시합니다. (숫자를 키울수록 더 큰 것만 남음)
+                if cv2.contourArea(cnt) < 40: 
+                    continue
+                
+                # 🚀 [개선 2] 선 단순화 (Douglas-Peucker 알고리즘)
+                # 지글지글한 점들의 모임을 팽팽한 직선으로 펴줍니다.
+                # 0.001 값을 0.002로 키우면 더 단순해지고, 줄이면 더 정밀해집니다.
+                epsilon = 0.001 * cv2.arcLength(cnt, True)
+                approx = cv2.approxPolyDP(cnt, epsilon, True)
+                
+                points = approx.reshape(-1, 2)
+                
+                # 🚀 [개선 3] DXF에 선 그리기
                 for i in range(len(points) - 1):
                     p1 = (float(points[i][0]), float(-points[i][1]))
                     p2 = (float(points[i+1][0]), float(-points[i+1][1]))
                     msp.add_line(p1, p2)
+                    
+                # 도형이 닫혀있다면 마지막 점과 첫 점을 연결
+                if len(points) > 2:
+                    msp.add_line((float(points[-1][0]), float(-points[-1][1])), 
+                                (float(points[0][0]), float(-points[0][1])))
 
-            doc.saveas(output_dxf_path) # 👈 이 코드가 실행되면 기존 DXF가 보정된 값으로 덮어씌워집니다.
+            doc.saveas(output_dxf_path)
             
-            # NestJS로 완료 신호 보냄
+            # NestJS 결과 보고
             await result_queue.add("completed", {
                 "drawingId": data['drawingId'],
                 "status": "COMPLETED",
                 "resultUrl": output_dxf_path.replace("../backend-api/", "")
             })
-            print(f"✨ 최종 DXF 생성 완료 (보정값 적용됨)")
+            print(f"✨ [성공] 최종 DXF 저장 완료: {output_dxf_path}")
 
     except Exception as e:
         print(f"❌ 에러: {e}")
