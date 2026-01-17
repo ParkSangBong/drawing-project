@@ -107,49 +107,101 @@ async def process_drawing(job, job_id):
             # })
             # print(f"✨ 최종 DXF 생성 완료 (보정값 적용됨)")
 
+            #
             # --- 최종 변환 모드: DXF 생성 ---
+            # output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
+            
+            # # 1. 윤곽선 추출
+            # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # doc = ezdxf.new(dxfversion="R2010")
+            # msp = doc.modelspace()
+
+            # for cnt in contours:
+            #     # 🚀 [개선 1] 면적 필터링 강화
+            #     # 너무 작은 점(먼지)은 무시합니다. (숫자를 키울수록 더 큰 것만 남음)
+            #     if cv2.contourArea(cnt) < 40: 
+            #         continue
+                
+            #     # 🚀 [개선 2] 선 단순화 (Douglas-Peucker 알고리즘)
+            #     # 지글지글한 점들의 모임을 팽팽한 직선으로 펴줍니다.
+            #     # 0.001 값을 0.002로 키우면 더 단순해지고, 줄이면 더 정밀해집니다.
+            #     epsilon = 0.001 * cv2.arcLength(cnt, True)
+            #     approx = cv2.approxPolyDP(cnt, epsilon, True)
+                
+            #     points = approx.reshape(-1, 2)
+                
+            #     # 🚀 [개선 3] DXF에 선 그리기
+            #     for i in range(len(points) - 1):
+            #         p1 = (float(points[i][0]), float(-points[i][1]))
+            #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
+            #         msp.add_line(p1, p2)
+                    
+            #     # 도형이 닫혀있다면 마지막 점과 첫 점을 연결
+            #     if len(points) > 2:
+            #         msp.add_line((float(points[-1][0]), float(-points[-1][1])), 
+            #                     (float(points[0][0]), float(-points[0][1])))
+
+            # doc.saveas(output_dxf_path)
+            
+            # # NestJS 결과 보고
+            # await result_queue.add("completed", {
+            #     "drawingId": data['drawingId'],
+            #     "status": "COMPLETED",
+            #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
+            # })
+            # print(f"✨ [성공] 최종 DXF 저장 완료: {output_dxf_path}")
+            # --- 최종 변환 모드: 지능형 DXF 생성 ---
             output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
-            
-            # 1. 윤곽선 추출
-            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
             doc = ezdxf.new(dxfversion="R2010")
             msp = doc.modelspace()
 
-            for cnt in contours:
-                # 🚀 [개선 1] 면적 필터링 강화
-                # 너무 작은 점(먼지)은 무시합니다. (숫자를 키울수록 더 큰 것만 남음)
-                if cv2.contourArea(cnt) < 40: 
-                    continue
-                
-                # 🚀 [개선 2] 선 단순화 (Douglas-Peucker 알고리즘)
-                # 지글지글한 점들의 모임을 팽팽한 직선으로 펴줍니다.
-                # 0.001 값을 0.002로 키우면 더 단순해지고, 줄이면 더 정밀해집니다.
-                epsilon = 0.001 * cv2.arcLength(cnt, True)
-                approx = cv2.approxPolyDP(cnt, epsilon, True)
-                
-                points = approx.reshape(-1, 2)
-                
-                # 🚀 [개선 3] DXF에 선 그리기
-                for i in range(len(points) - 1):
-                    p1 = (float(points[i][0]), float(-points[i][1]))
-                    p2 = (float(points[i+1][0]), float(-points[i+1][1]))
-                    msp.add_line(p1, p2)
+            # 1. 직선 검출을 위한 가공 (Canny Edge Detection)
+            # 선의 엣지만 따서 직선 검출 확률을 높입니다.
+            edges = cv2.Canny(thresh, 50, 150, apertureSize=3)
+
+            # 2. [핵심] 확률적 허프 변환 (HoughLinesP)
+            # rho: 거리 해상도, theta: 각도 해상도, threshold: 직선 인정 기준
+            # minLineLength: 이보다 짧은 선은 무시, maxLineGap: 이 간격 내의 선은 하나로 이음
+            lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=80, 
+                                   minLineLength=30, maxLineGap=10)
+
+            if lines is not None:
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
                     
-                # 도형이 닫혀있다면 마지막 점과 첫 점을 연결
-                if len(points) > 2:
-                    msp.add_line((float(points[-1][0]), float(-points[-1][1])), 
-                                (float(points[0][0]), float(-points[0][1])))
+                    # 🚀 직선 보정 로직: 미세하게 기운 선을 수평/수직으로 고정
+                    if abs(x1 - x2) < 15: # 수직선에 가까우면 x축 고정
+                        x2 = x1
+                    if abs(y1 - y2) < 15: # 수평선에 가까우면 y축 고정
+                        y2 = y1
+                        
+                    # DXF에 추가 (좌표계 보정 포함)
+                    msp.add_line((float(x1), float(-y1)), (float(x2), float(-y2)))
+                print(f"📏 직선 {len(lines)}개 검출 및 보정 완료")
+
+            # 3. 원형 검출 (HoughCircles) - 옵션
+            # 스케치에서 원형 부품(ø28 등)을 찾을 때 유용합니다.
+            circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, 20,
+                                      param1=50, param2=30, minRadius=10, maxRadius=100)
+            
+            if circles is not None:
+                circles = np.uint16(np.around(circles))
+                for i in circles[0, :]:
+                    center = (float(i[0]), float(-i[1]))
+                    radius = float(i[2])
+                    msp.add_circle(center, radius)
+                print(f"⭕ 원형 {len(circles[0])}개 검출 완료")
 
             doc.saveas(output_dxf_path)
             
-            # NestJS 결과 보고
+            # 결과 보고
             await result_queue.add("completed", {
                 "drawingId": data['drawingId'],
                 "status": "COMPLETED",
                 "resultUrl": output_dxf_path.replace("../backend-api/", "")
             })
-            print(f"✨ [성공] 최종 DXF 저장 완료: {output_dxf_path}")
+            print(f"✨ 지능형 DXF 변환 완료!")
 
     except Exception as e:
         print(f"❌ 에러: {e}")
