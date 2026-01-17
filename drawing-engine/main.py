@@ -5,6 +5,7 @@ import cv2 # OpenCV
 import numpy as np
 import ezdxf # DXF 생성용
 import os
+
 # 결과를 다시 NestJS로 보내기 위한 큐 설정
 result_queue = Queue("drawing-results", {
     "connection": "redis://127.0.0.1:6379"
@@ -14,24 +15,24 @@ async def process_drawing(job, job_id):
     data = job.data
     input_path = f"../backend-api/{data['filePath']}"
     
-    # [추가] 슬라이더로부터 넘어올 파라미터 (기본값 설정)
-    # block_size: 격자 제거 범위, c_value: 선명도 감도
+    # 1. 프론트엔드/백엔드에서 넘어온 5개 파라미터 수신
     block_size = data.get('blockSize', 11) 
     c_value = data.get('cValue', 2)
-    mode = data.get('mode', 'FINAL').upper() # PREVIEW 또는 FINAL
+    line_thresh = data.get('lineThresh', 80)    # 직선 검출 감도
+    min_dist = data.get('minDist', 50)          # 원형 간 최소 거리
+    circle_param = data.get('circleParam', 30)  # 원형 검출 정밀도
+    mode = data.get('mode', 'FINAL').upper()
 
     try:
         img = cv2.imread(input_path)
         if img is None: raise Exception("이미지 로드 실패")
 
-        # 1. 전처리 (그레이스케일 & 블러)
+        # 2. 기본 전처리 (그레이스케일 & 블러)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        # 2. [핵심] 적응형 임계값 처리 (Adaptive Threshold)
-        # 사용자가 조절한 block_size와 c_value를 여기에 적용합니다!
-        if block_size % 2 == 0: block_size += 1 # 홀수 제약 조건
-        
+        # 3. 적응형 임계값 처리 (Adaptive Threshold)
+        if block_size % 2 == 0: block_size += 1
         thresh = cv2.adaptiveThreshold(
             blurred, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -41,283 +42,83 @@ async def process_drawing(job, job_id):
         )
 
         if mode == 'PREVIEW':
-            # --- 미리보기 모드: 처리된 이미지만 저장해서 결과 전송 ---
+            # --- 🚀 지능형 미리보기 모드: 실시간 시각화 ---
+            # 흑백(thresh) 이미지를 컬러(BGR)로 변환하여 그 위에 색깔 선을 그립니다.
+            preview_canvas = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+            
+            # (A) 직선 검출 시각화 (빨간색)
+            edges = cv2.Canny(thresh, 50, 150)
+            lines = cv2.HoughLinesP(edges, 1, np.pi/180, 
+                                   threshold=line_thresh, 
+                                   minLineLength=30, maxLineGap=10)
+            if lines is not None:
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    cv2.line(preview_canvas, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
+            # (B) 원형 검출 시각화 (초록색)
+            circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, 
+                                      minDist=min_dist, 
+                                      param1=50, param2=circle_param, 
+                                      minRadius=10, maxRadius=100)
+            if circles is not None:
+                circles = np.uint16(np.around(circles))
+                for i in circles[0, :]:
+                    cv2.circle(preview_canvas, (i[0], i[1]), i[2], (0, 255, 0), 2)
+            
             preview_path = input_path.rsplit('.', 1)[0] + "_preview.png"
-            cv2.imwrite(preview_path, thresh)
+            cv2.imwrite(preview_path, preview_canvas)
             
             await result_queue.add("preview-ready", {
                 "drawingId": data['drawingId'],
                 "status": "PREVIEW_READY",
                 "previewUrl": preview_path.replace("../backend-api/", "")
             })
-            print(f"🖼️ 미리보기 생성 완료 (BS:{block_size}, C:{c_value})")
+            print(f"🖼️ [PREVIEW] 시각화 완료: 직선 감도({line_thresh}), 원형 거리({min_dist})")
 
         else:
-            # # --- 최종 변환 모드: DXF 생성 (기존 로직) ---
-            # output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
-            # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # doc = ezdxf.new(dxfversion="R2010")
-            # msp = doc.modelspace()
-
-            # for cnt in contours:
-            #     if cv2.contourArea(cnt) < 10: continue
-            #     points = cnt.reshape(-1, 2)
-            #     for i in range(len(points) - 1):
-            #         p1 = (float(points[i][0]), float(-points[i][1]))
-            #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
-            #         msp.add_line(p1, p2)
-
-            # doc.saveas(output_dxf_path)
-            # await result_queue.add("completed", {
-            #     "drawingId": data['drawingId'],
-            #     "status": "COMPLETED",
-            #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
-            # })
-            # print(f"✨ 최종 DXF 생성 완료")
-
-            #
-            # --- 최종 변환 모드: DXF 생성 ---
-            # output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
-            # # output_dxf_path = input_path.rsplit('.', 1)[0] + "_fixed.dxf"
-            # # 확인 로그 추가 (실제 어디에 저장되는지 터미널에서 보세요)
-            # print(f"📍 실제 저장 경로: {os.path.abspath(output_dxf_path)}")
-            # # [중요] 여기서 사용되는 'thresh'는 위에서 슬라이더 값(block_size, c_value)이 
-            # # 적용되어 계산된 변수입니다. 따라서 이론적으로는 현재 잘 짜여진 상태입니다!
-            # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # doc = ezdxf.new(dxfversion="R2010")
-            # msp = doc.modelspace()
-
-            # for cnt in contours:
-            #     if cv2.contourArea(cnt) < 10: continue
-            #     points = cnt.reshape(-1, 2)
-            #     for i in range(len(points) - 1):
-            #         p1 = (float(points[i][0]), float(-points[i][1]))
-            #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
-            #         msp.add_line(p1, p2)
-
-            # doc.saveas(output_dxf_path) # 👈 이 코드가 실행되면 기존 DXF가 보정된 값으로 덮어씌워집니다.
-            
-            # # NestJS로 완료 신호 보냄
-            # await result_queue.add("completed", {
-            #     "drawingId": data['drawingId'],
-            #     "status": "COMPLETED",
-            #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
-            # })
-            # print(f"✨ 최종 DXF 생성 완료 (보정값 적용됨)")
-
-            #
-            # --- 최종 변환 모드: DXF 생성 ---
-            # output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
-            
-            # # 1. 윤곽선 추출
-            # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # doc = ezdxf.new(dxfversion="R2010")
-            # msp = doc.modelspace()
-
-            # for cnt in contours:
-            #     # 🚀 [개선 1] 면적 필터링 강화
-            #     # 너무 작은 점(먼지)은 무시합니다. (숫자를 키울수록 더 큰 것만 남음)
-            #     if cv2.contourArea(cnt) < 40: 
-            #         continue
-                
-            #     # 🚀 [개선 2] 선 단순화 (Douglas-Peucker 알고리즘)
-            #     # 지글지글한 점들의 모임을 팽팽한 직선으로 펴줍니다.
-            #     # 0.001 값을 0.002로 키우면 더 단순해지고, 줄이면 더 정밀해집니다.
-            #     epsilon = 0.001 * cv2.arcLength(cnt, True)
-            #     approx = cv2.approxPolyDP(cnt, epsilon, True)
-                
-            #     points = approx.reshape(-1, 2)
-                
-            #     # 🚀 [개선 3] DXF에 선 그리기
-            #     for i in range(len(points) - 1):
-            #         p1 = (float(points[i][0]), float(-points[i][1]))
-            #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
-            #         msp.add_line(p1, p2)
-                    
-            #     # 도형이 닫혀있다면 마지막 점과 첫 점을 연결
-            #     if len(points) > 2:
-            #         msp.add_line((float(points[-1][0]), float(-points[-1][1])), 
-            #                     (float(points[0][0]), float(-points[0][1])))
-
-            # doc.saveas(output_dxf_path)
-            
-            # # NestJS 결과 보고
-            # await result_queue.add("completed", {
-            #     "drawingId": data['drawingId'],
-            #     "status": "COMPLETED",
-            #     "resultUrl": output_dxf_path.replace("../backend-api/", "")
-            # })
-            # print(f"✨ [성공] 최종 DXF 저장 완료: {output_dxf_path}")
-            # --- 최종 변환 모드: 지능형 DXF 생성 ---
+            # --- 🚀 최종 변환 모드: 지능형 DXF 생성 ---
             output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
             doc = ezdxf.new(dxfversion="R2010")
             msp = doc.modelspace()
 
-            # 1. 직선 검출을 위한 가공 (Canny Edge Detection)
-            # 선의 엣지만 따서 직선 검출 확률을 높입니다.
-            edges = cv2.Canny(thresh, 50, 150, apertureSize=3)
-
-            # 2. [핵심] 확률적 허프 변환 (HoughLinesP)
-            # rho: 거리 해상도, theta: 각도 해상도, threshold: 직선 인정 기준
-            # minLineLength: 이보다 짧은 선은 무시, maxLineGap: 이 간격 내의 선은 하나로 이음
-            lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=80, 
+            # (A) 직선 검출 및 수평/수직 보정 적용
+            edges = cv2.Canny(thresh, 50, 150)
+            lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=line_thresh, 
                                    minLineLength=30, maxLineGap=10)
-
             if lines is not None:
                 for line in lines:
                     x1, y1, x2, y2 = line[0]
-                    
-                    # 🚀 직선 보정 로직: 미세하게 기운 선을 수평/수직으로 고정
-                    if abs(x1 - x2) < 15: # 수직선에 가까우면 x축 고정
-                        x2 = x1
-                    if abs(y1 - y2) < 15: # 수평선에 가까우면 y축 고정
-                        y2 = y1
-                        
-                    # DXF에 추가 (좌표계 보정 포함)
+                    # 수직/수평 보정 로직 (15픽셀 미만 오차 고정)
+                    if abs(x1 - x2) < 15: x2 = x1
+                    if abs(y1 - y2) < 15: y2 = y1
                     msp.add_line((float(x1), float(-y1)), (float(x2), float(-y2)))
-                print(f"📏 직선 {len(lines)}개 검출 및 보정 완료")
 
-            # 3. 원형 검출 (HoughCircles) - 옵션
-            # 스케치에서 원형 부품(ø28 등)을 찾을 때 유용합니다.
-            circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, 20,
-                                      param1=50, param2=30, minRadius=10, maxRadius=100)
-            
+            # (B) 원형 검출 및 DXF 추가
+            circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, minDist=min_dist, 
+                                      param1=50, param2=circle_param, minRadius=10, maxRadius=100)
             if circles is not None:
                 circles = np.uint16(np.around(circles))
                 for i in circles[0, :]:
-                    center = (float(i[0]), float(-i[1]))
-                    radius = float(i[2])
-                    msp.add_circle(center, radius)
-                print(f"⭕ 원형 {len(circles[0])}개 검출 완료")
+                    msp.add_circle((float(i[0]), float(-i[1])), float(i[2]))
 
             doc.saveas(output_dxf_path)
             
-            # 결과 보고
             await result_queue.add("completed", {
                 "drawingId": data['drawingId'],
                 "status": "COMPLETED",
                 "resultUrl": output_dxf_path.replace("../backend-api/", "")
             })
-            print(f"✨ 지능형 DXF 변환 완료!")
+            print(f"✨ [FINAL] 지능형 DXF 변환 완료: {output_dxf_path}")
 
     except Exception as e:
-        print(f"❌ 에러: {e}")
-
-# 실제 이미지를 변환하는 로직이 들어갈 함수
-# async def process_drawing(job, job_id):
-#     print(f"\n[🔥 변환 시작] Job ID: {job_id}")
-#     time.sleep(5)
-#     print(f"\n[🔥🔥🔥🔥🔥 변환 시작] Job ID: {job_id}")
-#     data = job.data
-#     input_path = f"../backend-api/{data['filePath']}" # NestJS가 저장한 경로
-#     output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
-
-#     try:
-#         # 1. 이미지 로드 (OpenCV)
-#         img = cv2.imread(input_path)
-#         if img is None:
-#             raise Exception("이미지를 불러올 수 없습니다.")
-
-#         # 2. 전처리: 그레이스케일 변환 및 이진화 (선 선명하게 따기)
-#         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-#         # 블러로 노이즈 제거 후, 적응형 임계값 처리
-#         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-#         thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-
-#         # 3. 윤곽선(Contours) 찾기
-#         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-#         # 4. DXF 파일 생성 (캐드 데이터 쓰기)
-#         doc = ezdxf.new(dxfversion="R2010")
-#         msp = doc.modelspace()
-
-#         # for cnt in contours:
-#         #     # 1. 면적 필터링 (너무 작은 점/먼지 제거)
-#         #     if cv2.contourArea(cnt) < 50: # 기준을 조금 더 높였습니다
-#         #         continue
-            
-#         #     # 2. 선 팽팽하게 펴기 (Douglas-Peucker 알고리즘)
-#         #     # epsilon값이 커질수록 선이 더 단순해지고 직선화됩니다.
-#         #     epsilon = 0.01 * cv2.arcLength(cnt, True) 
-#         #     approx = cv2.approxPolyDP(cnt, epsilon, True)
-
-#         #     # 3. DXF에 그리기
-#         #     points = approx.reshape(-1, 2)
-#         #     for i in range(len(points) - 1):
-#         #         p1 = (float(points[i][0]), float(-points[i][1]))
-#         #         p2 = (float(points[i+1][0]), float(-points[i+1][1]))
-#         #         msp.add_line(p1, p2)
-            
-#         #     # 마지막 점과 첫 점을 이어주기 (닫힌 도형일 경우)
-#         #     msp.add_line((float(points[-1][0]), float(-points[-1][1])), 
-#         #                  (float(points[0][0]), float(-points[0][1])))
-
-#         for cnt in contours:
-#             # 너무 작은 점들은 노이즈로 판단하고 무시 (면적 기준)
-#             if cv2.contourArea(cnt) < 10:
-#                 continue
-            
-#             # 윤곽선 좌표를 캐드의 LINE 데이터로 변환
-#             points = cnt.reshape(-1, 2)
-#             for i in range(len(points) - 1):
-#                 p1 = (float(points[i][0]), float(-points[i][1])) # 캐드 좌표계 보정
-#                 p2 = (float(points[i+1][0]), float(-points[i+1][1]))
-#                 msp.add_line(p1, p2)
-
-#         doc.saveas(output_dxf_path)
-#         print(f"✨ DXF 생성 완료: {output_dxf_path}")
-
-#         # 5. 결과 전송
-#         await result_queue.add("completed", {
-#             "drawingId": data['drawingId'],
-#             "status": "COMPLETED",
-#             "resultUrl": output_dxf_path.replace("../backend-api/", "") 
-#         })
-
-#     except Exception as e:
-#         print(f"❌ 에러 발생: {e}")
-#     # print(f"\n[🔥 작업 수신] Job ID: {job_id}")
-#     # data = job.data
-#     # print(f"📦 처리 데이터: {data}")
-    
-#     # # 도면 변환 시뮬레이션 (나중에 여기에 OpenCV 코드가 들어갑니다)
-#     # print("🛠 도면 변환 시작 (OpenCV Processing...)...")
-#     # await asyncio.sleep(3) # 3초간 무거운 연산을 하는 척 합니다.
-    
-#     # print(f"✅ 작업 완료! (Drawing ID: {data['drawingId']})")
-    
-#     # # 처리 결과를 반환 (NestJS에서 이 결과를 확인할 수 있습니다)
-#     # return {"status": "SUCCESS", "path": data['filePath'], "timestamp": time.time()}
-
-#     # print(f"\n[🔥 작업 수신] Job ID: {job_id}")
-#     # data = job.data
-    
-#     # print("🛠 도면 변환 중...")
-#     # await asyncio.sleep(3) # 시뮬레이션
-    
-#     # # 작업 완료 후 결과 큐에 데이터 넣기
-#     # print(f"📢 결과 전송 중 (ID: {data['drawingId']})...")
-#     # await result_queue.add("completed", {
-#     #     "drawingId": data['drawingId'],
-#     #     "status": "COMPLETED",
-#     #     "resultUrl": f"processed_{data['filePath']}" # 가상의 결과 경로
-#     # })
-    
-#     # print(f"✅ 작업 완료 및 결과 전송 성공!")
+        print(f"❌ 에러 발생: {e}")
 
 async def main():
-    print("🚀 Drawing Engine Worker 가동 중... (Redis 감시 시작)")
-    
-    # 'drawing-conversion' 큐를 감시합니다.
-    # NestJS에서 127.0.0.1로 성공했으니 여기서도 똑같이 맞춰줍니다.
+    print("🚀 Drawing Engine Worker 가동 중... (Hough Transform Mode)")
     worker = Worker("drawing-conversion", process_drawing, {
         "connection": "redis://127.0.0.1:6379"
     })
-
-    # 워커가 죽지 않고 계속 실행되게 유지합니다.
     try:
         while True:
             await asyncio.sleep(1)

@@ -35,27 +35,39 @@ export class DrawingsService {
   //   };
   // }
 
-  async requestPreview(id: number, blockSize: number, cValue: number, mode: string = 'PREVIEW') {
-    // DB에서 원본 파일 경로를 가져와야 파이썬이 처리할 수 있습니다.
+  // 기존의 개별 인자 방식에서 params 객체 방식으로 변경
+  async requestPreview(id: number, params: any) {
+    // 1. DB에서 도면 정보 조회
     const drawing = await this.drizzle.db
       .select()
       .from(drawings)
       .where(eq(drawings.id, id))
       .then(res => res[0]);
-  
-    if (!drawing) return;
-  
-    // 파이썬 엔진(BullMQ)에 작업 추가
-    await this.conversionQueue.add('convert', {
-      drawingId: id,
-      filePath: drawing.originalUrl,
-      blockSize: blockSize,
-      cValue: cValue,
-      mode: mode // 핵심: 파이썬이 빠르게 이미지만 만들게 함
-    }, { 
-      jobId: `${mode}-${id}-${Date.now()}`, // 동일 도면의 미리보기 요청은 덮어쓰거나 관리하기 위함
-      removeOnComplete: true 
-    });
+
+    if (!drawing) {
+      console.error(`❌ [Service] 도면을 찾을 수 없습니다: ID ${id}`);
+      return;
+    }
+
+    // 2. Redis 큐에 변환 작업 추가
+    try {
+      await this.conversionQueue.add('convert', {
+        drawingId: id,
+        filePath: drawing.originalUrl,
+        // 🚀 핵심: 프론트에서 보낸 모든 슬라이더 값(blockSize, cValue, lineThresh, minDist, circleParam, mode)을 
+        // 스프레드 연산자로 한꺼번에 담습니다.
+        ...params 
+      }, { 
+        // 동일 도면의 미리보기 요청이 쌓이지 않도록 jobId 관리
+        // Date.now()를 빼면 동일 모드/ID에 대해 큐에서 중복을 더 엄격히 방지할 수 있습니다.
+        jobId: `${params.mode}-${id}`, 
+        removeOnComplete: true 
+      });
+
+      console.log(`📡 [${params.mode}] 큐 전송 완료 (ID: ${id})`);
+    } catch (error) {
+      console.error('❌ Redis 작업 추가 실패:', error);
+    }
   }
 
   async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED') {

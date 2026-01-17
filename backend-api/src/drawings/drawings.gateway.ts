@@ -41,13 +41,14 @@ import { forwardRef, Inject } from '@nestjs/common';
 
     @SubscribeMessage('adjustParameters')
     async handleAdjustParameters(@MessageBody() data: any) {
-      console.info('📥 슬라이더 파라미터 수신:', data);
+      // 1. 로그를 통해 모든 파라미터가 잘 오는지 확인 (디버깅용)
+      console.info('📥 수신된 전체 파라미터:', data);
 
+      // 2. data 객체 전체를 서비스로 넘깁니다. 
+      // (인자를 하나씩 나열하지 않아도 되므로 코드가 훨씬 간결해집니다)
       await this.drawingsService.requestPreview(
         data.drawingId,
-        data.blockSize,
-        data.cValue,
-        data.mode
+        data // 여기서 모든 파라미터(blockSize, cValue, lineThresh, minDist, circleParam, mode)가 담긴 객체를 보냅니다.
       );
     }
   }

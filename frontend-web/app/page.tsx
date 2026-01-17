@@ -19,6 +19,9 @@ export default function Home() {
   const [blockSize, setBlockSize] = useState(11);
   const [cValue, setCValue] = useState(2);
   const [editingId, setEditingId] = useState<number | null>(null); // 현재 편집 중인 도면 ID
+  const [lineThresh, setLineThresh] = useState(80); // 직선 감도
+  const [minDist, setMinDist] = useState(50);      // 원형 간 최소 거리
+  const [circleParam, setCircleParam] = useState(30); // 원형 정밀도
 
   // b. 슬라이더 값이 바뀔 때마다 서버에 알리는 함수 (Socket 이용)
   // const emitAdjust = (newBlockSize: number, newCValue: number) => {
@@ -38,14 +41,32 @@ export default function Home() {
   //   }
   // };
   // 1. emitAdjust 함수 수정 (mode 인자 추가 및 안정성 강화)
-  const emitAdjust = (newBlockSize: number, newCValue: number, mode: string = 'PREVIEW') => {
-    if (!editingId && mode === 'PREVIEW') return; // ID 없으면 무시
+  const emitAdjust = (
+    newBlockSize: number, 
+    newCValue: number, 
+    newLineThresh: number, 
+    newMinDist: number, 
+    newCircleParam: number,
+    mode: string = 'PREVIEW'
+  ) => {
+    // 1. 현재 편집 중인 도면이 없으면 중단 (FINAL 모드는 ID가 확실히 있을 때만 실행되므로 안전장치)
+    if (!editingId) return;
 
+    // 2. 소켓이 연결되어 있다면 서버로 모든 파라미터 전송
     if (socket) {
+      console.log(`📤 [${mode}] 파라미터 전송:`, { 
+        drawingId: editingId, 
+        blockSize: newBlockSize, 
+        lineThresh: newLineThresh 
+      });
+
       socket.emit('adjustParameters', {
         drawingId: editingId,
         blockSize: newBlockSize,
         cValue: newCValue,
+        lineThresh: newLineThresh,   // 추가된 직선 감도
+        minDist: newMinDist,         // 추가된 원형 거리
+        circleParam: newCircleParam, // 추가된 원형 정밀도
         mode: mode
       });
     }
@@ -69,12 +90,15 @@ export default function Home() {
     
     alert('최종 CAD 변환을 시작합니다. 잠시만 기다려주세요!');
     
-    // 서버에 'FINAL' 모드로 요청 보냄
+    // 🚀 서버에 'FINAL' 모드로 모든 파라미터를 담아 요청 보냄
     socket.emit('adjustParameters', {
       drawingId: editingId,
       blockSize: blockSize,
       cValue: cValue,
-      mode: 'FINAL' // 이제 PREVIEW가 아닌 FINAL입니다!
+      lineThresh: lineThresh,   // 추가
+      minDist: minDist,         // 추가
+      circleParam: circleParam, // 추가
+      mode: 'FINAL'
     });
   };
 
@@ -373,40 +397,94 @@ export default function Home() {
           )}
         </div>
 
-        <div className="space-y-6">
-          {/* 격자 제거 (Block Size) 슬라이더 */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              격자/노이즈 제거 강도 (Block Size): {blockSize}
-            </label>
-            <input 
-              type="range" min="3" max="99" step="2" 
-              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              value={blockSize}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setBlockSize(val);
-                emitAdjust(val, cValue);
-              }}
-            />
-          </div>
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">
+            격자/노이즈 제거 강도 (Block Size): {blockSize}
+          </label>
+          <input 
+            type="range" min="3" max="99" step="2" 
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            value={blockSize}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setBlockSize(val);
+              // 🚀 모든 인자를 순서대로 전달 (val은 새로 바뀐 값, 나머지는 현재 변수값)
+              emitAdjust(val, cValue, lineThresh, minDist, circleParam);
+            }}
+          />
+        </div>
 
-          {/* 선명도 (C Value) 슬라이더 */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              선명도 세부 조절 (C Value): {cValue}
-            </label>
-            <input 
-              type="range" min="0" max="20" 
-              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
-              value={cValue}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setCValue(val);
-                emitAdjust(blockSize, val);
-              }}
-            />
-          </div>
+        {/* 2. 선명도 (C Value) 슬라이더 */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">
+            선명도 세부 조절 (C Value): {cValue}
+          </label>
+          <input 
+            type="range" min="0" max="20" 
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+            value={cValue}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setCValue(val);
+              // 🚀 cValue 위치에 새로운 val 전달
+              emitAdjust(blockSize, val, lineThresh, minDist, circleParam);
+            }}
+          />
+        </div>
+
+        {/* 1. 직선 검출 감도 (Line Threshold) */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
+            직선 검출 감도 (Line Threshold): {lineThresh}
+          </label>
+          <input 
+            type="range" min="10" max="200" 
+            value={lineThresh} 
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setLineThresh(v);
+              // 순서: blockSize, cValue, lineThresh, minDist, circleParam
+              emitAdjust(blockSize, cValue, v, minDist, circleParam);
+            }} 
+            style={{ width: '100%', cursor: 'pointer', accentColor: '#ef4444' }} // 빨간색 포인트
+          />
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>값이 낮을수록 짧은 선도 직선으로 인식합니다.</p>
+        </div>
+
+        {/* 2. 원형 중복 방지 거리 (Min Distance) */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
+            원형 중복 방지 거리 (Min Distance): {minDist}
+          </label>
+          <input 
+            type="range" min="10" max="300" 
+            value={minDist} 
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setMinDist(v);
+              emitAdjust(blockSize, cValue, lineThresh, v, circleParam);
+            }} 
+            style={{ width: '100%', cursor: 'pointer', accentColor: '#f59e0b' }} // 노란색 포인트
+          />
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>값이 클수록 비슷한 위치의 원들을 하나로 합칩니다.</p>
+        </div>
+
+        {/* 3. 원형 검출 정밀도 (Circle Param) */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
+            원형 검출 정밀도 (Circle Param): {circleParam}
+          </label>
+          <input 
+            type="range" min="10" max="100" 
+            value={circleParam} 
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setCircleParam(v);
+              emitAdjust(blockSize, cValue, lineThresh, minDist, v);
+            }} 
+            style={{ width: '100%', cursor: 'pointer', accentColor: '#10b981' }} // 초록색 포인트
+          />
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>값이 낮을수록 더 많은 원을 찾으려 시도합니다.</p>
         </div>
 
         <div className="mt-6 flex justify-end">
@@ -482,13 +560,25 @@ export default function Home() {
                         setEditingId(d.id); // 편집 타겟 변경
                         setProcessedPreview(null); // 이전 미리보기 잔상 지우기
                         
-                        // 버튼 누르자마자 서버에 현재 슬라이더 값으로 미리보기 요청 (선택 사항)
-                        emitAdjust(blockSize, cValue); 
+                        // 🚀 수정된 부분: 늘어난 5개 인자를 모두 순서대로 넣어줍니다.
+                        emitAdjust(
+                          blockSize, 
+                          cValue, 
+                          lineThresh, 
+                          minDist, 
+                          circleParam,
+                          'PREVIEW' // 생략 가능 (기본값이 'PREVIEW'이므로)
+                        ); 
                       }}
                       style={{
-                        padding: '8px 16px', backgroundColor: '#f39c12', color: 'white',
-                        borderRadius: '4px', border: 'none', cursor: 'pointer',
-                        fontSize: '0.85rem', fontWeight: 'bold'
+                        padding: '8px 16px', 
+                        backgroundColor: '#f39c12', 
+                        color: 'white',
+                        borderRadius: '4px', 
+                        border: 'none', 
+                        cursor: 'pointer',
+                        fontSize: '0.85rem', 
+                        fontWeight: 'bold'
                       }}
                     >
                       보정 편집
