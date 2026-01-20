@@ -20,7 +20,7 @@ export class DrawingResultsProcessor extends WorkerHost {
 
   async process(job: Job<any>): Promise<any> {
     // const { drawingId, status } = job.data;
-    const { drawingId, status, previewUrl } = job.data; // previewUrl 추가 수신
+    const { drawingId, status, previewUrl, extractedDimensions } = job.data; // previewUrl 추가 수신
 
     console.log(`📩 From Python RESULT : ID ${drawingId} -> ${status}`);
 
@@ -29,6 +29,7 @@ export class DrawingResultsProcessor extends WorkerHost {
       this.drawingsGateway.server.emit('previewReady', {
         drawingId,
         previewUrl, // 예: uploads/filename_preview.png
+        extractedDimensions,
       });
       console.log(`✅ 프론트엔드로 미리보기 알림 발송 완료`);
     } else {

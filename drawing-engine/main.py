@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import ezdxf
 import os
+import pytesseract
 # 🚀 필수: HEIC 처리를 위한 라이브러리
 from PIL import Image
 from pillow_heif import register_heif_opener
@@ -65,6 +66,33 @@ async def process_drawing(job, job_id):
         detected_circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, minDist=min_dist, 
                                            param1=50, param2=circle_param, minRadius=10, maxRadius=100)
 
+        # 🚀 [추가] OCR 수치 추출 로직
+        # 도면은 보통 가로/세로로 숫자가 적혀있으므로 'psm 6' 설정을 사용합니다.
+        # 숫자에 집중하기 위해 'digits' 화이트리스트를 설정할 수도 있습니다.
+        # 🚀 [개선] OCR 수치 추출 로직
+        # --psm 11: 텍스트 방향을 무시하고 흩어진 숫자를 최대한 많이 찾습니다.
+        # tessedit_char_whitelist: 숫자와 소수점만 읽도록 제한하여 'ㄱ', 'ㄴ' 같은 노이즈를 배제합니다.
+        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
+
+        extracted_text = pytesseract.image_to_string(thresh, config=custom_config) #
+
+        raw_words = extracted_text.split()
+        dimensions = []
+
+        for word in raw_words:
+            clean_word = "".join(filter(str.isdigit, word))
+            
+            # 🚀 필터링: 10미만(너무 작은 숫자)이나 5000이상(비현실적 숫자)은 무시
+            if len(clean_word) >= 2: # 최소 2자리 이상만 (10, 20... 등)
+                num = int(clean_word)
+                if 10 <= num <= 5000:
+                    dimensions.append(str(num))
+
+        # 중복 제거 및 정렬
+        dimensions = sorted(list(set(dimensions)), key=int)
+        
+        print(f"✅ [정제된 수치 리스트]: {dimensions}")
+
         if mode == 'PREVIEW':
             preview_canvas = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
             if detected_lines is not None:
@@ -78,7 +106,14 @@ async def process_drawing(job, job_id):
             
             preview_path = input_path.rsplit('.', 1)[0] + "_preview.png"
             cv2.imwrite(preview_path, preview_canvas)
-            await result_queue.add("preview-ready", {"drawingId": data['drawingId'], "status": "PREVIEW_READY", "previewUrl": preview_path.replace("../backend-api/", "")})
+            # await result_queue.add("preview-ready", {"drawingId": data['drawingId'], "status": "PREVIEW_READY", "previewUrl": preview_path.replace("../backend-api/", "")})
+            # ✅ [개선] 미리보기 응답에 추출된 숫자 데이터도 함께 보냅니다.
+            await result_queue.add("preview-ready", {
+                "drawingId": data['drawingId'],
+                "status": "PREVIEW_READY",
+                "previewUrl": preview_path.replace("../backend-api/", ""),
+                "extractedDimensions": dimensions # 프론트엔드에서 리스트로 보여줄 데이터
+            })
 
         else:
             output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
