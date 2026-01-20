@@ -311,11 +311,20 @@ export default function Home() {
             marginBottom: '10px'
           }}>
             {previewUrl ? (
-              <img 
-                src={previewUrl} 
-                alt="미리보기" 
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-              />
+              // 🚀 파일 확장자가 .heic인 경우와 아닌 경우를 나눕니다.
+              file?.name.toLowerCase().endsWith('.heic') ? (
+                <div style={{ textAlign: 'center', padding: '10px' }}>
+                  <p style={{ fontSize: '2rem', marginBottom: '10px' }}>📱</p>
+                  <p style={{ color: '#aaa', fontSize: '0.85rem' }}>아이폰(HEIC) 형식은<br/>미리보기를 지원하지 않습니다.</p>
+                  <p style={{ color: '#3498db', fontSize: '0.75rem', marginTop: '5px' }}>* 변환은 정상적으로 가능합니다.</p>
+                </div>
+              ) : (
+                <img 
+                  src={previewUrl} 
+                  alt="미리보기" 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                />
+              )
             ) : (
               <span style={{ color: '#666', fontSize: '0.9rem' }}>이미지 미리보기</span>
             )}
