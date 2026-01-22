@@ -3,21 +3,21 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);  
+    const configService = app.get(ConfigService); // 추가
 
     app.enableCors({
-        origin: '*',
+        origin: configService.get('FRONTEND_URL'), 
+        credentials: true,
     });
 
-    // 수정된 부분: 'upload' -> 'uploads' (실제 폴더명과 일치시켜야 합니다)
-    // prefix도 '/uploads'로 설정하여 http://localhost:3000/uploads/파일명 으로 접속하게 합니다.
     app.useStaticAssets(join(process.cwd(), 'uploads'), {
         prefix: '/uploads',
     });
 
-    // 경로 확인용 로그 (서버 실행 시 터미널에 찍힙니다)
     console.log(`🚀 정적 파일 경로: ${join(process.cwd(), 'uploads')}`);
 
     const config = new DocumentBuilder()
@@ -29,6 +29,8 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api', app, document);
 
-    await app.listen(process.env.PORT ?? 3000);
+    const port = configService.get('PORT') || 3000;
+    await app.listen(port);
+    console.log(`🚀 서버가 ${port}번 포트에서 가동 중입니다.`);
 }
 bootstrap();

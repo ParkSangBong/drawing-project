@@ -4,17 +4,24 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DrizzleModule } from './db/drizzle/drizzle.module';
 import { DrawingsModule } from './drawings/drawings.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [ 
-    // Redis 연결 설정 (Docker의 dada-redis 서비스와 연결)
-    BullModule.forRoot({
-      connection: {
-        host: '127.0.0.1',
-        port: 6379,
-      },
+    ConfigModule.forRoot({ isGlobal: true }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST'),
+          port: configService.get<number>('REDIS_PORT'),
+        },
+      }),
+      inject: [ConfigService],
     }),
-    DrizzleModule, DrawingsModule],
+    DrizzleModule, 
+    DrawingsModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
