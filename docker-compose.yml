@@ -1,16 +1,18 @@
-version: '3.8'
-
 services:
   # 데이터베이스 (MySQL 8.0)
   db:
     image: mysql:8.0
+    healthcheck:  # 🚀 DB 상태를 체크하는 로직 추가
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
     container_name: drawing-service-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: drawing_service_db
-      MYSQL_USER: user
-      MYSQL_PASSWORD: user_password
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -23,5 +25,52 @@ services:
     ports:
       - "6379:6379"
 
+  # 🚀 추가: 백엔드 API
+  backend:
+    build: ./backend-api
+    container_name: drawing-service-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file: ./backend-api/.env
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend-api/uploads:/app/uploads
+
+  # 🚀 추가: 파이썬 이미지 엔진
+  engine:
+    build: ./drawing-engine
+    container_name: drawing-service-engine
+    restart: always
+    env_file: ./drawing-engine/.env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - BACKEND_API_PATH=/app/backend-api
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+    volumes:
+      - ./backend-api/uploads:/app/backend-api/uploads
+
+  # 🚀 추가: 프론트엔드 웹
+  frontend:
+    build: ./frontend-web
+    container_name: drawing-service-frontend
+    restart: always
+    ports:
+      - "3001:3000"
+    env_file: ./frontend-web/.env.local
+    depends_on:
+      - backend
+
 volumes:
   db_data:
+
+

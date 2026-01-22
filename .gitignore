@@ -13,6 +13,7 @@ dist/
 .next/
 
 .env
+.env*
 
 .DS_Store
 
