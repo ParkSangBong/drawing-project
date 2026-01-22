@@ -30,7 +30,11 @@ result_queue = Queue("drawing-results", {
 })
 
 async def process_drawing(job, job_id):
+    print(f"📥 [작업 수신] Job ID: {job_id}, Data: {job.data}") # 추가
     data = job.data
+
+    start_time = data.get('startTime')
+
     # 🚀 수정: 환경 변수 기반 경로 설정
     input_path = os.path.join(BACKEND_API_BASE_PATH, data['filePath'])
     
@@ -108,8 +112,10 @@ async def process_drawing(job, job_id):
                 "drawingId": data['drawingId'],
                 "status": "PREVIEW_READY",
                 "previewUrl": preview_path.replace(BACKEND_API_BASE_PATH + "/", ""),
-                "extractedDimensions": dimensions
+                "extractedDimensions": dimensions,
+                "startTime": start_time,
             })
+            print(f"✨ [미리보기 생성 완료] 결과 전송 완료 (ID: {job_id})")
 
         else:
             output_dxf_path = input_path.rsplit('.', 1)[0] + ".dxf"
@@ -138,22 +144,35 @@ async def process_drawing(job, job_id):
             await result_queue.add("completed", {
                 "drawingId": data['drawingId'], 
                 "status": "COMPLETED", 
-                "resultUrl": output_dxf_path.replace(BACKEND_API_BASE_PATH + "/", "")
+                "resultUrl": output_dxf_path.replace(BACKEND_API_BASE_PATH + "/", ""),
+                "startTime": start_time,
             })
+            print(f"✨ [최종 변환 완료] DXF 저장 및 신호 전송 완료 (ID: {job_id})")
+
             print(f"✨ 변환 완료 및 신호 전송")
 
     except Exception as e:
-        print(f"❌ 에러 발생: {e}")
+        print(f"❌ [에러 발생] Job ID {job_id}: {e}")
 
 async def main():
     print(f"🚀 Drawing Engine Worker 가동 중... (Redis: {REDIS_URL})")
+    
+    # 🚀 'drawing-conversion' 큐 이름이 백엔드와 일치해야 합니다.
     worker = Worker("drawing-conversion", process_drawing, {
-        "connection": REDIS_URL # 🚀 환경 변수 주소 적용
+        "connection": REDIS_URL,
+        "concurrency": 2
     })
+    
+    print("✅ Redis 연결 및 작업 대기 중...")
+    
     try:
-        while True:
-            await asyncio.sleep(1)
-    except asyncio.CancelledError:
+        # 🚀 delay() 대신 Future를 사용하여 워커가 계속 살아있게 만듭니다.
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        await future
+    except Exception as e:
+        print(f"❌ 워커 실행 중 에러: {e}")
+    finally:
         await worker.close()
 
 if __name__ == "__main__":

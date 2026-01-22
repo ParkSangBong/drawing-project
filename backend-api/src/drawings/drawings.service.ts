@@ -29,12 +29,14 @@ export class DrawingsService {
 
     // 2. Redis 큐에 변환 작업 추가
     try {
+      const startTime = Date.now(); // 🚀 시작 시간 기록
       await this.conversionQueue.add('convert', {
         drawingId: id,
         filePath: drawing.originalUrl,
+        startTime,
         ...params 
       }, { 
-        jobId: `${params.mode}-${id}`, 
+        jobId: `${params.mode}-${id}-${startTime}`, 
         removeOnComplete: true 
       });
 
@@ -69,7 +71,8 @@ export class DrawingsService {
     console.log('DB Insert Result:', result);
     
     const drawingId = (result as any)[0].insertId; 
-  
+    const startTime = Date.now();
+
     // 2. Redis에 넣기 전 로그
     console.log(`Attempting to add job to Redis: drawingId=${drawingId}`);
   
@@ -77,6 +80,7 @@ export class DrawingsService {
       const job = await this.conversionQueue.add('convert', {
         drawingId: drawingId,
         filePath: filePath,
+        startTime,
       });
       console.log('✅ Job added to Redis successfully! Job ID:', job.id);
     } catch (error) {
