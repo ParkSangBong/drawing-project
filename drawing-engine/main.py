@@ -6,20 +6,33 @@ import numpy as np
 import ezdxf
 import os
 import pytesseract
-# 🚀 필수: HEIC 처리를 위한 라이브러리
 from PIL import Image
 from pillow_heif import register_heif_opener
+# 🚀 추가: 환경 변수 로드를 위한 라이브러리
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 # Pillow에서 HEIC를 지원하도록 등록
 register_heif_opener()
 
+# 🚀 환경 변수 적용: Redis 주소
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
+# 🚀 환경 변수 적용: 백엔드 API 상대 경로
+BACKEND_API_BASE_PATH = os.getenv("BACKEND_API_PATH", "../backend-api")
+# 🚀 환경 변수 적용: Tesseract 경로 (필요 시)
+if os.getenv("TESSERACT_PATH"):
+    pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_PATH")
+
 result_queue = Queue("drawing-results", {
-    "connection": "redis://127.0.0.1:6379"
+    "connection": REDIS_URL
 })
 
 async def process_drawing(job, job_id):
     data = job.data
-    input_path = f"../backend-api/{data['filePath']}"
+    # 🚀 수정: 환경 변수 기반 경로 설정
+    input_path = os.path.join(BACKEND_API_BASE_PATH, data['filePath'])
     
     block_size = data.get('blockSize', 11) 
     c_value = data.get('cValue', 2)
@@ -29,24 +42,18 @@ async def process_drawing(job, job_id):
     mode = data.get('mode', 'FINAL').upper()
 
     try:
-        # 🚀 [수정] 이미지 로더 파트
         img = None
         if input_path.lower().endswith('.heic'):
-            # HEIC 파일 처리
             heif_file = Image.open(input_path)
-            # RGB로 변환 후 numpy 배열로 전환
             img_rgb = np.array(heif_file.convert('RGB'))
-            # OpenCV 형식인 BGR로 최종 변환
             img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
             print(f"📸 HEIC 이미지 변환 로드 완료")
         else:
-            # 일반 이미지 처리
             img = cv2.imread(input_path)
 
         if img is None: 
             raise Exception(f"이미지 로드 실패: {input_path}")
         
-        # --- 이후 로직은 동일 (중앙점 계산 및 검출) ---
         height, width = img.shape[:2]
         center_x, center_y = width // 2, height // 2
 
@@ -66,31 +73,21 @@ async def process_drawing(job, job_id):
         detected_circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, minDist=min_dist, 
                                            param1=50, param2=circle_param, minRadius=10, maxRadius=100)
 
-        # 🚀 [추가] OCR 수치 추출 로직
-        # 도면은 보통 가로/세로로 숫자가 적혀있으므로 'psm 6' 설정을 사용합니다.
-        # 숫자에 집중하기 위해 'digits' 화이트리스트를 설정할 수도 있습니다.
-        # 🚀 [개선] OCR 수치 추출 로직
-        # --psm 11: 텍스트 방향을 무시하고 흩어진 숫자를 최대한 많이 찾습니다.
-        # tessedit_char_whitelist: 숫자와 소수점만 읽도록 제한하여 'ㄱ', 'ㄴ' 같은 노이즈를 배제합니다.
         custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
-
-        extracted_text = pytesseract.image_to_string(thresh, config=custom_config) #
+        extracted_text = pytesseract.image_to_string(thresh, config=custom_config) 
 
         raw_words = extracted_text.split()
         dimensions = []
 
         for word in raw_words:
             clean_word = "".join(filter(str.isdigit, word))
-            
-            # 🚀 필터링: 10미만(너무 작은 숫자)이나 5000이상(비현실적 숫자)은 무시
-            if len(clean_word) >= 2: # 최소 2자리 이상만 (10, 20... 등)
+            # 필터링: 1자리이상, 1미만(너무 작은 숫자)이나 50000이상(비현실적 숫자)은 무시
+            if len(clean_word) >= 1:
                 num = int(clean_word)
-                if 10 <= num <= 5000:
+                if 1 <= num <= 5000:
                     dimensions.append(str(num))
 
-        # 중복 제거 및 정렬
         dimensions = sorted(list(set(dimensions)), key=int)
-        
         print(f"✅ [정제된 수치 리스트]: {dimensions}")
 
         if mode == 'PREVIEW':
@@ -106,13 +103,12 @@ async def process_drawing(job, job_id):
             
             preview_path = input_path.rsplit('.', 1)[0] + "_preview.png"
             cv2.imwrite(preview_path, preview_canvas)
-            # await result_queue.add("preview-ready", {"drawingId": data['drawingId'], "status": "PREVIEW_READY", "previewUrl": preview_path.replace("../backend-api/", "")})
-            # ✅ [개선] 미리보기 응답에 추출된 숫자 데이터도 함께 보냅니다.
+            
             await result_queue.add("preview-ready", {
                 "drawingId": data['drawingId'],
                 "status": "PREVIEW_READY",
-                "previewUrl": preview_path.replace("../backend-api/", ""),
-                "extractedDimensions": dimensions # 프론트엔드에서 리스트로 보여줄 데이터
+                "previewUrl": preview_path.replace(BACKEND_API_BASE_PATH + "/", ""),
+                "extractedDimensions": dimensions
             })
 
         else:
@@ -139,16 +135,20 @@ async def process_drawing(job, job_id):
                     )
 
             doc.saveas(output_dxf_path)
-            await result_queue.add("completed", {"drawingId": data['drawingId'], "status": "COMPLETED", "resultUrl": output_dxf_path.replace("../backend-api/", "")})
+            await result_queue.add("completed", {
+                "drawingId": data['drawingId'], 
+                "status": "COMPLETED", 
+                "resultUrl": output_dxf_path.replace(BACKEND_API_BASE_PATH + "/", "")
+            })
             print(f"✨ 변환 완료 및 신호 전송")
 
     except Exception as e:
         print(f"❌ 에러 발생: {e}")
 
 async def main():
-    print("🚀 Drawing Engine Worker 가동 중... (HEIC & Hough Mode)")
+    print(f"🚀 Drawing Engine Worker 가동 중... (Redis: {REDIS_URL})")
     worker = Worker("drawing-conversion", process_drawing, {
-        "connection": "redis://127.0.0.1:6379"
+        "connection": REDIS_URL # 🚀 환경 변수 주소 적용
     })
     try:
         while True:
