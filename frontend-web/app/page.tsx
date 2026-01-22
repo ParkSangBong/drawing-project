@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export default function Home() {
   const [socket, setSocket] = useState<any>(null);
   const [processedPreview, setProcessedPreview] = useState<string | null>(null);
@@ -45,13 +47,15 @@ export default function Home() {
   };
 
   const fetchDrawings = async () => {
-    const res = await axios.get('http://localhost:3000/drawings');
+    // 🚀 [수정] 환경 변수 적용
+    const res = await axios.get(`${API_URL}/drawings`);
     setDrawings(res.data);
   };
 
   useEffect(() => {
     fetchDrawings();
-    const newSocket = io('http://localhost:3000');
+    // 🚀 [수정] 환경 변수 적용
+    const newSocket = io(API_URL);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -64,7 +68,8 @@ export default function Home() {
 
     newSocket.on('previewReady', (data: { previewUrl: string, extractedDimensions?: string[] }) => {
       console.log('🖼️ 미리보기 및 수신 데이터:', data);
-      const fullUrl = `http://localhost:3000/${data.previewUrl}?t=${Date.now()}`;
+      // 🚀 [수정] 환경 변수 적용
+      const fullUrl = `${API_URL}/${data.previewUrl}?t=${Date.now()}`;
       setProcessedPreview(fullUrl);
       
       // 서버에서 수치 리스트가 오면 상태 업데이트
@@ -94,7 +99,7 @@ export default function Home() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await axios.post('http://localhost:3000/drawings/upload', formData);
+      const res = await axios.post(`${API_URL}/drawings/upload`, formData);
       const newId = res.data.drawingId; 
       setEditingId(newId);
       setProcessedPreview(null);
@@ -140,7 +145,7 @@ export default function Home() {
   const getDxfUrl = (originalUrl: string) => {
     const lastDotIndex = originalUrl.lastIndexOf('.');
     const basePath = originalUrl.substring(0, lastDotIndex);
-    return `http://localhost:3000/${basePath}.dxf?t=${Date.now()}`;
+    return `${API_URL}/${basePath}.dxf?t=${Date.now()}`;
   };
 
   return (
