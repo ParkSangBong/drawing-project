@@ -61,7 +61,10 @@ services:
 
   # 🚀 추가: 프론트엔드 웹
   frontend:
-    build: ./frontend-web
+    build: 
+      context: ./frontend-web
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: drawing-service-frontend
     restart: always
     ports:

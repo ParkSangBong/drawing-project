@@ -9,8 +9,17 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);  
     const configService = app.get(ConfigService); // 추가
 
+    const rawFrontendUrls = configService.get('FRONTEND_URL') || 'http://localhost:3001';
+    const allowedOrigins = rawFrontendUrls.split(',');
+
     app.enableCors({
-        origin: configService.get('FRONTEND_URL'), 
+        origin: (origin, callback) => {
+            if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+            } else {
+            callback(new Error('Not allowed by CORS'));
+            }
+        },
         credentials: true,
     });
 
