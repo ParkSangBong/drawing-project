@@ -14,9 +14,11 @@ async function bootstrap() {
 
     app.enableCors({
         origin: (origin, callback) => {
+            // 1. 로컬 접속이나 origin이 없는 경우(소켓 내부 호출 등) 허용
             if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
             } else {
+            console.log("차단된 오리진:", origin); // 여기서 어떤 주소가 차단되는지 로그로 확인 가능합니다!
             callback(new Error('Not allowed by CORS'));
             }
         },
