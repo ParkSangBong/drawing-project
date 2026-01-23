@@ -2,11 +2,6 @@
 
 어머님의 설계 작업을 돕기 위해 시작된, 수기 도면을 디지털 벡터 데이터로 변환하는 실시간 웹 서비스입니다.
 
-## 📺 서비스 데모 (Demo)
-(이곳에 실제 구동 화면이나 비포/애프터 이미지를 넣어 프로젝트의 핵심 가치를 즉각 전달하세요)
-
-설명: 도면 업로드부터 실시간 변환 완료 알림까지의 전체 프로세스
-
 ## 🚀 주요 성과 (Key Achievements)
 
 ### 1. 실시간 비동기 아키텍처 구축
@@ -116,46 +111,45 @@ graph TD
 
 (이곳에 Swagger UI 메인 화면 캡처본을 작게 넣어 설계의 깔끔함을 보여주세요)MethodEndpointDescriptionPOST/drawings/upload도면 이미지 업로드 및 변환 작업 큐 등록GET/drawings/:id특정 도면의 변환 상태 및 결과 조회
 
-<!-- ## 🚀 시작하기 (Getting Started)
+## 🗄️ 데이터베이스 설계 (Database Design)
 
-### 1. 인프라 실행 (Docker)
-Redis와 MySQL을 도커로 간편하게 실행합니다.
-```Bash
-docker-compose up -d
+데이터의 일관성을 위해 Drizzle ORM을 사용하여 MySQL 스키마를 정의했습니다. 특히 status 컬럼은 Enum 타입을 사용하여 도면 변환의 비동기 작업 상태를 엄격하게 관리하도록 설계했습니다.
+
+
+```mermaid
+erDiagram
+    drawings {
+        serial id PK "Primary Key"
+        varchar file_name "NOT NULL"
+        varchar original_url "NOT NULL"
+        enum status "PENDING, PROCESSING, COMPLETED, FAILED"
+        timestamp created_at "Default: NOW()"
+    }
 ```
 
-### 2. 백엔드 설정 및 실행 (NestJS)
-```Bash
-cd backend-api
-npm install
+### 1. Entity Relationship Diagram (ERD)
+- **drawings**: 도면 업로드 정보, 변환 상태, 엔진 처리 결과 및 성능 지표를 통합 관리합니다.
 
-# .env 설정 (DB 연결 정보 및 Redis 정보 입력)
-cp .env.example .env 
+### 2. 주요 스키마 정의 (Schema Definition)
+- Strict Status Management: mysqlEnum을 사용하여 PENDING, PROCESSING, COMPLETED, FAILED 4단계 상태를 정의했습니다. 이를 통해 비동기 작업 큐(BullMQ)와 파이썬 엔진 간의 상태 동기화를 엄격하게 통제합니다.
 
-npx drizzle-kit push  # DB 스키마 동기화
-npm run start:dev     # 서버 실행 (Swagger: http://localhost:3000/api)
-```
+- Data Traceability: original_url 컬럼을 통해 원본 이미지의 저장 위치를 추적하며, 서버 내 물리적 경로 관리의 일관성을 유지합니다.
 
-### 3. 프론트엔드 설정 및 실행 (Next.js)
-```Bash
+- Time-series Tracking: createdAt에 defaultNow()를 적용하여 도면 생성 시점을 자동으로 기록, 작업 이력 추적 및 정렬의 기준점으로 활용합니다.
 
-cd frontend-web
-npm install
+    💡 설계 의도 (Design Choice)
 
-# .env.local 설정 (API 및 WebSocket 주소 입력)
-npm run dev           # 대시보드 접속: http://localhost:3001
-```
+    - Drizzle ORM 활용: SQL과 유사한 선언적 문법을 사용하면서도 TypeScript와의 1:1 타입 매핑을 지원하여, 개발 단계에서의 런타임 에러를 방지하고 타입 안정성을 확보했습니다.
 
-### 4. 파이썬 엔진 실행 (OpenCV/BullMQ)
-```Bash      
-cd drawing-engine
-# 가상환경 구축 및 라이브러리 설치
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+    - 인코딩 최적화: MySQL 8.0 환경에서 utf8mb4 설정을 권장하여 한글 파일명 및 특수문자 처리 시 데이터 깨짐 현상을 방지하도록 설계했습니다.
 
-python main.py        # 엔진 가동 및 작업 대기
-``` -->
+### 데이터 타입 선택 이유
+
+현재는 도면의 메타데이터 관리에 집중하고 있으며, 향후 추출된 좌표 데이터의 대용량 처리를 위해 JSON 또는 TEXT 타입을 도입하여 가변적인 데이터 크기에 유연하게 대응할 계획입니다.
+
+### 테이블 확장 계획
+
+향후 users 테이블을 추가하여 1:N 관계의 사용자별 도면 이력 관리 기능을 구현하고, 변환 성능 최적화를 위한 process_time 컬럼을 추가하여 모니터링 시스템을 고도화할 예정입니다.
 
 ## 🚀 시작하기 (Getting Started)
 
