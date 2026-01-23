@@ -21,12 +21,77 @@
 - **Backend**: NestJS, Drizzle ORM, BullMQ, Socket.io
 - **Engine**: Python, OpenCV, Redis
 - **Database**: MySQL (utf8mb4 환경 최적화)
+- **Infra**: Docker Compose, Nginx Proxy Manager (SSL)
 
-## 🎯 차별화 포인트 (Problem Solving)
-- **한글 인코딩 트러블슈팅**: Multer의 latin1 인코딩 한계를 `Buffer.from(name, 'latin1').toString('utf8')`로 해결한 과정 기록.
-- **서버 자원 최적화**: 무의미한 HTTP 요청을 줄이기 위해 이벤트 기반 아키텍처로 고도화.
+## 🏗️ 시스템 아키텍처 (System Architecture)
+이 프로젝트는 단일 서버 구조를 넘어, 각 서비스가 컨테이너로 격리된 마이크로서비스 지향 아키텍처로 설계되었습니다.
 
-## 🚀 시작하기 (Getting Started)
+
+```graph TD
+    User((사용자)) -->|HTTPS/443| NPM[Nginx Proxy Manager]
+    
+    subgraph "Docker Internal Network"
+        NPM -->|Proxy| Front[Next.js Frontend]
+        NPM -->|Proxy| Back[NestJS Backend]
+        Back <--> DB[(MySQL)]
+        Back <--> Redis((Redis Queue))
+        Redis <--> Engine[Python Analysis Engine]
+        
+        Back -.->|Shared Volume| Storage[(Shared Storage)]
+        Engine -.->|Shared Volume| Storage
+```
+
+## 🛡️ 인프라 및 보안 설계 상세 (Infrastructure Deep Dive)
+- SSL Termination: Nginx Proxy Manager를 도입하여 Let's Encrypt 기반의 전 구간 HTTPS 암호화 통신을 구현했습니다.
+
+- Port Minimization: 외부 개방 포트를 80(HTTP), 443(HTTPS)으로 단일화하여 공격 접점(Attack Surface)을 최소화했습니다.
+
+- Network Isolation: DB와 Redis를 외부 노출 없이 내부 네트워크에서만 통신하도록 격리하여 인프라 보안을 강화했습니다.
+
+## 🎯 주요 이슈 해결 (Troubleshooting Chronicle)
+1. 불필요한 네트워크 부하 (Network Optimization)
+    
+    현상: 도면 변환 확인을 위한 3초 주기 Polling이 서버 자원 및 대역폭 낭비 초래.
+
+    해결: WebSocket(Socket.io)을 도입하여 변환 완료 시점에만 서버가 클라이언트에게 신호를 보내도록 개선.
+
+2. 한글 파일명 깨짐 (Encoding Issue)
+
+    현상: Multer를 통해 전달받은 한글 파일명이 latin1으로 해석되어 깨짐 발생.
+
+    해결: Buffer.from(file.originalname, 'latin1').toString('utf8')을 통해 원본 바이트 데이터를 UTF-8로 재구성하여 해결했습니다.
+
+3. HTTPS 환경에서의 Mixed Content 및 CORS 이슈
+
+    현상: SSL 적용 후 프론트엔드(HTTPS)에서 백엔드(HTTP) 호출 시 보안 정책에 의해 차단됨.
+
+    해결: API 전용 서브도메인(api.quitelog.com)을 할당하고, NestJS main.ts에서 Dynamic Origin Whitelist 로직을 구현하여 실제 차단된 오리진을 추적하고 허용 목록에 추가했습니다.
+
+4. 실시간 통신 및 웹소켓 최적화
+
+    현상: 배포 환경에서 Socket.io 연결 시 404 Not Found 및 SSL_PROTOCOL_ERROR 발생.
+
+    해결: Nginx 프록시 설정에서 Websockets Support를 활성화하고, 클라이언트 측 소켓 주소에서 포트 번호를 제거하여 도메인 기반 라우팅으로 통일했습니다.
+
+5. 도커 컨테이너 간 "localhost" 통신 실패
+
+    현상: 컨테이너화 이후 백엔드에서 DB 및 Redis 접속 불가 (ECONNREFUSED).
+
+    원인: 컨테이너 내부에서 localhost는 자기 자신을 가리키며 호스트 PC를 가리키지 않음.
+
+    해결: docker-compose.yml에 정의된 서비스 명(db, redis)을 호스트 네임으로 사용하여 도커 내장 DNS를 통해 통신하도록 수정했습니다.
+
+## 📂 프로젝트 구조 (Project Structure)
+```
+.
+├── backend-api/          # NestJS 기반 API 서버 (BullMQ, Socket.io)
+├── frontend-web/         # Next.js 기반 대시보드 (Tailwind CSS)
+├── drawing-engine/       # Python 기반 OpenCV 분석 엔진
+├── npm/                  # Nginx Proxy Manager 데이터 및 인증서
+└── docker-compose.yml    # 전체 서비스 오케스트레이션 설정
+```
+
+<!-- ## 🚀 시작하기 (Getting Started)
 
 ### 1. 인프라 실행 (Docker)
 Redis와 MySQL을 도커로 간편하게 실행합니다.
@@ -57,8 +122,7 @@ npm run dev           # 대시보드 접속: http://localhost:3001
 ```
 
 ### 4. 파이썬 엔진 실행 (OpenCV/BullMQ)
-```Bash
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+```Bash      
 cd drawing-engine
 # 가상환경 구축 및 라이브러리 설치
 python -m venv venv
@@ -66,28 +130,41 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 python main.py        # 엔진 가동 및 작업 대기
+``` -->
+
+## 🚀 시작하기 (Getting Started)
+
+프로젝트는 **Docker Compose**를 통해 모든 마이크로서비스 인프라를 한 번에 가동할 수 있도록 설계되었습니다.
+
+### 1. 환경 변수 설정
+각 서비스 폴더 내의 `.env.example` 파일을 복사하여 실제 환경 변수 파일을 생성합니다.
+```bash
+# 루트 디렉토리에서 실행
+cp backend-api/.env.example backend-api/.env
+cp drawing-engine/.env.example drawing-engine/.env
+cp frontend-web/.env.example frontend-web/.env.local
 ```
 
-## 🏗️ 시스템 아키텍처 (System Architecture)
-이 프로젝트의 핵심인 데이터 흐름을 한눈에 파악할 수 있는 구조입니다.
+### 2. 전체 서비스 실행 (Docker)
+Docker Compose를 사용하여 DB, Redis, Backend, Engine, Frontend, Nginx Proxy Manager를 한 번에 실행합니다.
 
-Client: Next.js (File Upload & Real-time Update)
+```Bash
+# 전체 컨테이너 빌드 및 백그라운드 실행
+docker-compose up -d --build
+```
 
-API Server: NestJS (Job Queueing & DB Management)
+### 3. 초기 데이터베이스 설정
+백엔드 컨테이너가 가동되면 Drizzle ORM을 통해 스키마를 동기화합니다.
 
-Message Broker: Redis & BullMQ (Async Task Management)
+```Bash
+docker exec -it drawing-service-backend npx drizzle-kit push
+```
 
-Worker: Python Engine (OpenCV Image Processing)
+### 4. 접속 주소 확인
+Frontend Dashboard: https://quitelog.com (또는 로컬 http://localhost:3001)
 
-Real-time: Socket.io (Server-to-Client Notification)
+API Swagger: https://api.quitelog.com/api (또는 로컬 http://localhost:3000/api)
 
-## 🛠️ 주요 이슈 해결 (Troubleshooting)
-1. 한글 파일명 깨짐 (Encoding Issue)
-- 현상: Multer를 통해 전달받은 한글 파일명이 latin1으로 해석되어 깨짐 발생.
+Nginx Proxy Admin: http://localhost:81
 
-- 해결: Buffer.from(file.originalname, 'latin1').toString('utf8')을 통해 원본 바이트 데이터를 UTF-8로 재구성하여 해결.
-
-2. 불필요한 네트워크 부하 (Network Optimization)
-- 현상: 도면 변환 확인을 위한 3초 주기 Polling이 서버 자원 및 대역폭 낭비 초래.
-
-- 해결: **WebSocket(Socket.io)**을 도입하여 변환 완료 시점에만 서버가 클라이언트에게 신호를 보내도록 개선.
+---
