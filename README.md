@@ -2,11 +2,18 @@
 
 어머님의 설계 작업을 돕기 위해 시작된, 수기 도면을 디지털 벡터 데이터로 변환하는 실시간 웹 서비스입니다.
 
+## 📺 서비스 데모 (Demo)
+(이곳에 실제 구동 화면이나 비포/애프터 이미지를 넣어 프로젝트의 핵심 가치를 즉각 전달하세요)
+
+설명: 도면 업로드부터 실시간 변환 완료 알림까지의 전체 프로세스
+
 ## 🚀 주요 성과 (Key Achievements)
 
 ### 1. 실시간 비동기 아키텍처 구축
 - **WebSocket (Socket.io)**: Polling 방식을 제거하고 서버 푸시 기술을 도입하여 변환 완료 시 0초 지연 알림 구현.
 - **BullMQ & Redis**: NestJS와 Python 엔진 간의 작업 큐를 관리하여 안정적인 분산 처리 환경 구축.
+
+- **Why?**: (BullMQ 도입 이유 추가) 무거운 이미지 처리 작업을 메인 API 서버와 분리하여 처리함으로써, 변환 중에도 사용자가 대시보드의 다른 기능을 끊김 없이 이용할 수 있는 응답성을 확보했습니다.
 
 ### 2. 이미지 처리 및 벡터화 엔진 (Python & OpenCV)
 - **Adaptive Thresholding**: 조명 및 배경 노이즈(격자 무늬 등)를 효과적으로 제거하는 알고리즘 적용.
@@ -23,11 +30,17 @@
 - **Database**: MySQL (utf8mb4 환경 최적화)
 - **Infra**: Docker Compose, Nginx Proxy Manager (SSL)
 
+💡 기술 선택 이유 (Engineering Decision)
+
+Drizzle ORM: Type-safety를 완벽히 보장하면서도, Prisma 대비 가벼운 런타임 성능을 유지하기 위해 선택했습니다.
+
+Shared Volume: 컨테이너 간 대용량 이미지 데이터를 네트워크 전송 비용 없이 효율적으로 공유하기 위해 Docker Volume 전략을 활용했습니다.
+
 ## 🏗️ 시스템 아키텍처 (System Architecture)
 이 프로젝트는 단일 서버 구조를 넘어, 각 서비스가 컨테이너로 격리된 마이크로서비스 지향 아키텍처로 설계되었습니다.
 
-
-```graph TD
+```mermaid
+graph TD
     User((사용자)) -->|HTTPS/443| NPM[Nginx Proxy Manager]
     
     subgraph "Docker Internal Network"
@@ -39,6 +52,7 @@
         
         Back -.->|Shared Volume| Storage[(Shared Storage)]
         Engine -.->|Shared Volume| Storage
+    end
 ```
 
 ## 🛡️ 인프라 및 보안 설계 상세 (Infrastructure Deep Dive)
@@ -47,6 +61,12 @@
 - Port Minimization: 외부 개방 포트를 80(HTTP), 443(HTTPS)으로 단일화하여 공격 접점(Attack Surface)을 최소화했습니다.
 
 - Network Isolation: DB와 Redis를 외부 노출 없이 내부 네트워크에서만 통신하도록 격리하여 인프라 보안을 강화했습니다.
+
+- Health Checks & Monitoring:
+
+    - docker-compose의 healthcheck 기능을 통해 DB 상태를 실시간 모니터링하며, 서비스 간 실행 순서(depends_on)를 제어해 인프라 가동의 안정성을 확보했습니다.
+
+    - 백엔드에 Dynamic Origin Logging 시스템을 구축하여, 허용되지 않은 오리진의 접근 시도를 실시간으로 모니터링하고 보안 디버깅을 수행할 수 있는 환경을 마련했습니다.
 
 ## 🎯 주요 이슈 해결 (Troubleshooting Chronicle)
 1. 불필요한 네트워크 부하 (Network Optimization)
@@ -65,7 +85,7 @@
 
     현상: SSL 적용 후 프론트엔드(HTTPS)에서 백엔드(HTTP) 호출 시 보안 정책에 의해 차단됨.
 
-    해결: API 전용 서브도메인(api.quitelog.com)을 할당하고, NestJS main.ts에서 Dynamic Origin Whitelist 로직을 구현하여 실제 차단된 오리진을 추적하고 허용 목록에 추가했습니다.
+    해결: API 전용 서브도메인을 할당하고, NestJS main.ts에서 Dynamic Origin Whitelist 로직을 구현하여 차단된 오리진을 로그로 추적하고 실시간으로 대응했습니다.
 
 4. 실시간 통신 및 웹소켓 최적화
 
@@ -90,6 +110,11 @@
 ├── npm/                  # Nginx Proxy Manager 데이터 및 인증서
 └── docker-compose.yml    # 전체 서비스 오케스트레이션 설정
 ```
+
+## 📑 API 명세서 (API Documentation)
+백엔드 설계의 일관성을 위해 Swagger를 통한 자동 문서화를 적용했습니다.
+
+(이곳에 Swagger UI 메인 화면 캡처본을 작게 넣어 설계의 깔끔함을 보여주세요)MethodEndpointDescriptionPOST/drawings/upload도면 이미지 업로드 및 변환 작업 큐 등록GET/drawings/:id특정 도면의 변환 상태 및 결과 조회
 
 <!-- ## 🚀 시작하기 (Getting Started)
 
@@ -168,3 +193,10 @@ API Swagger: https://api.quitelog.com/api (또는 로컬 http://localhost:3000/a
 Nginx Proxy Admin: http://localhost:81
 
 ---
+
+## 📅 향후 개선 과제 (Roadmap)
+- AI 고도화: 변환 정확도 향상을 위한 딥러닝 기반 선 검출 모델 통합.
+
+- 편집 도구 확장: 웹상에서 변환된 벡터 데이터를 직접 수정할 수 있는 Canvas 편집 기능 추가.
+
+- CI/CD 자동화: GitHub Actions를 활용한 자동 빌드 및 배포 파이프라인 구축.
