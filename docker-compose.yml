@@ -36,6 +36,7 @@ services:
     environment:
       - DB_HOST=db
       - REDIS_HOST=redis
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
