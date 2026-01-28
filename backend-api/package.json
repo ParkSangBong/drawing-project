@@ -22,6 +22,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
@@ -32,6 +33,7 @@
     "@nestjs/websockets": "^11.1.12",
     "bullmq": "^5.66.5",
     "drizzle-orm": "^0.45.1",
+    "dxf-writer": "^1.18.4",
     "mysql2": "^3.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
