@@ -11,8 +11,29 @@ import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 export class DrawingsController {
   constructor(private readonly drawingsService: DrawingsService) {}
 
+  // =================================================================
+  // 🚀 [NEW] AI 도면 변환 API
+  // =================================================================
+  @Post('ai-convert')
+  @ApiOperation({ summary: 'AI를 이용한 도면 변환 (Gemini)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object', properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file')) // 메모리에 파일 임시 저장 (DiskStorage 안 씀)
+  async convertWithAi(@UploadedFile() file: Express.Multer.File) {
+    // 바로 서비스 호출
+    return this.drawingsService.convertWithGemini(file);
+  }
+
+  // =================================================================
+  // 📦 [EXISTING] 기존 업로드 및 조회 API
+  // =================================================================
+  
   @Post('upload')
-  @ApiOperation({ summary: '도면 이미지 업로드' })
+  @ApiOperation({ summary: '도면 이미지 업로드 (기존 방식)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -31,15 +52,11 @@ export class DrawingsController {
       }),
     }),
   )
-  
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    // [추가] 한글 파일명 깨짐 방지 로직
-    // 오리지널 이름을 Buffer를 이용해 latin1에서 utf8로 다시 인코딩합니다.
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     
-    console.log('디코딩된 파일명:', originalName); // 터미널에서 한글이 잘 나오는지 확인용
+    console.log('디코딩된 파일명:', originalName); 
 
-    // 수정된 originalName을 서비스로 전달합니다.
     return this.drawingsService.create(originalName, file.path);
   }
 
