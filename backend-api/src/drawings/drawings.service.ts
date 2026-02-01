@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { DrizzleService } from '../db/drizzle/drizzle.service';
@@ -6,96 +6,88 @@ import { drawings } from '../db/schema';
 import { DrawingsGateway } from './drawings.gateway';
 import { eq } from 'drizzle-orm';
 import { ConfigService } from '@nestjs/config';
-// 👇 [추가] AI 및 파일 처리를 위한 라이브러리
-import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// 👇 [변경] 최신 Gemini 3 SDK 임포트
+import { GoogleGenAI } from "@google/genai";
 import Drawing from 'dxf-writer';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
 export class DrawingsService {
-  private genAI: GoogleGenerativeAI;
+  // 👇 [변경] 타입 변경
+  private genAI: GoogleGenAI;
+  private readonly logger = new Logger(DrawingsService.name);
 
   constructor(
     private readonly drizzle: DrizzleService,
-    @InjectQueue('drawing-conversion') private conversionQueue: Queue, // 큐 주입 유지
+    @InjectQueue('drawing-conversion') private conversionQueue: Queue,
     private readonly drawingsGateway: DrawingsGateway,
     private readonly configService: ConfigService,
   ) {
-    // const apiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
-    const apiKey = "AIzaSyAORVgdDZ91d9hx_MjmFzJ4wB2RyJ5yJIY";
-    // API 키 설정 (루트 .env 파일에 GEMINI_API_KEY가 있어야 합니다)
-
-    console.log('🔑 현재 적용된 API Key:', apiKey.substring(0, 5) + '...');
+    // 🛠️ [설정] .env에서 가져오거나, 테스트용으로 직접 입력하세요.
+    // const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+    const apiKey = "AIzaSyAORVgdDZ91d9hx_MjmFzJ4wB2RyJ5yJIY"; // 사용자님 키 유지
 
     if (!apiKey) {
-      console.warn('⚠️ GEMINI_API_KEY가 설정되지 않았습니다. AI 기능이 동작하지 않을 수 있습니다.');
+      this.logger.warn('⚠️ GEMINI_API_KEY가 설정되지 않았습니다.');
+    } else {
+      this.logger.log(`🔑 API Key 적용됨: ${apiKey.substring(0, 5)}...`);
     }
       
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    // 👇 [변경] Gemini 3 초기화 방식 (객체 형태 { apiKey: ... })
+    this.genAI = new GoogleGenAI({ apiKey: apiKey });
   }
 
   // =================================================================
-  // 🚀 [NEW] Gemini AI 변환 로직 (여기가 새로 추가된 핵심입니다)
+  // 🚀 [NEW] Gemini 3 AI 변환 로직
   // =================================================================
 
   async convertWithGemini(file: Express.Multer.File): Promise<any> {
     try {
-      console.log('🤖 Gemini AI 분석 시작...');
+      this.logger.log('🤖 Gemini 3 AI 분석 시작...');
       
       // 1. 이미지 분석 요청
       const designData = await this.analyzeImage(file.buffer);
-      console.log('📊 분석 완료! 데이터:', JSON.stringify(designData, null, 2));
+      this.logger.log(`📊 분석 완료! 데이터: ${JSON.stringify(designData, null, 2)}`);
 
       // 2. DXF 파일 생성
       const dxfContent = this.createDxf(designData);
       
       // 3. 파일 저장
       const fileName = `ai_drawing_${Date.now()}.dxf`;
-      // 도커 환경의 /app/uploads 경로 확보
       const uploadDir = path.join(process.cwd(), 'uploads');
       
       if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir);
+        fs.mkdirSync(uploadDir, { recursive: true });
       }
 
       const uploadPath = path.join(uploadDir, fileName);
       fs.writeFileSync(uploadPath, dxfContent);
-      console.log(`💾 DXF 파일 저장 완료: ${fileName}`);
-
-      // 4. (선택사항) DB에 '완료' 상태로 기록 남기기
-      // 필요하면 아래 주석을 풀어서 사용하세요.
-      /*
-      await this.drizzle.db.insert(drawings).values({
-        fileName: fileName,
-        originalUrl: `/uploads/${fileName}`,
-        status: 'COMPLETED',
-      });
-      */
+      this.logger.log(`💾 DXF 파일 저장 완료: ${fileName}`);
       
       return {
         success: true,
         message: '변환 성공',
         dxfUrl: `/uploads/${fileName}`,
-        aiData: designData // 프론트 디버깅용
+        aiData: designData 
       };
 
     } catch (error) {
-      console.error('❌ AI 변환 실패:', error);
-      throw new InternalServerErrorException('AI 변환 중 오류가 발생했습니다.');
+      this.logger.error(`❌ AI 변환 실패: ${error}`);
+      throw new InternalServerErrorException(`AI 변환 중 오류 발생: ${error.message}`);
     }
   }
 
-  // [Private] Gemini API 호출
+  // 👇 [변경] Gemini 3 API 호출 방식 (핵심 변경 구간)
   private async analyzeImage(imageBuffer: Buffer): Promise<any> {
-    // const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
-    const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const base64Image = imageBuffer.toString('base64');
 
     const prompt = `
       You are an expert mechanical engineer. Analyze this technical drawing image.
       Extract geometric shapes and dimensions.
       
-      Return ONLY a raw JSON object (no markdown) with this structure:
+      Return ONLY a raw JSON object with this structure:
       {
         "elements": [
           { "type": "CIRCLE", "x": 0, "y": 0, "r": 10 },
@@ -106,32 +98,58 @@ export class DrawingsService {
       Coordinates Guide: Assume bottom-left of the main object is (0,0).
     `;
 
-    const imagePart = {
-      inlineData: {
-        data: imageBuffer.toString('base64'),
-        mimeType: 'image/jpeg',
-      },
-    };
+    // 👇 [변경] GoogleGenAI v1beta (Gemini 3) 호출 문법
+    const response = await this.genAI.models.generateContent({
+      model: "gemini-3-flash-preview", // 👈 아까 확인한 최신 모델명!
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            { 
+              inlineData: { 
+                mimeType: "image/jpeg", 
+                data: base64Image 
+              } 
+            }
+          ]
+        }
+      ],
+      // 👇 [신규] JSON 모드 강제 (Gemini 3 기능)
+      config: {
+        responseMimeType: "application/json", 
+      }
+    });
 
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = await result.response;
-    let text = response.text();
+    // 👇 [변경] 응답 데이터 추출 (response.text)
+    let text = response.text;
 
-    // 마크다운 제거
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    if (!text) {
+      throw new Error('Gemini가 텍스트를 반환하지 않았습니다. (Empty Response)');
+    } else {
+      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+    
+    // // 안전장치: 혹시 모를 마크다운 제거
+    // if (text) {
+    //     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // }
+    
     return JSON.parse(text);
   }
 
-  // [Private] DXF 생성
+  // [Private] DXF 생성 (기존 유지)
   private createDxf(data: any): string {
     const d = new Drawing();
     d.setUnits('Millimeters');
 
     if (data.elements) {
       data.elements.forEach((el: any) => {
-        if (el.type === 'CIRCLE') d.drawCircle(el.x, el.y, el.r);
-        else if (el.type === 'LINE') d.drawLine(el.x1, el.y1, el.x2, el.y2);
-        else if (el.type === 'TEXT') d.drawText(el.x, el.y, el.height, 0, el.content);
+        // 대소문자 호환성 처리
+        const type = el.type ? el.type.toUpperCase() : '';
+        
+        if (type === 'CIRCLE') d.drawCircle(el.x, el.y, el.r);
+        else if (type === 'LINE') d.drawLine(el.x1, el.y1, el.x2, el.y2);
+        else if (type === 'TEXT') d.drawText(el.x, el.y, el.height, 0, el.content);
       });
     }
     return d.toDxfString();
@@ -142,7 +160,6 @@ export class DrawingsService {
   // =================================================================
 
   async requestPreview(id: number, params: any) {
-    // 1. DB에서 도면 정보 조회
     const drawing = await this.drizzle.db
       .select()
       .from(drawings)
@@ -150,11 +167,10 @@ export class DrawingsService {
       .then(res => res[0]);
 
     if (!drawing) {
-      console.error(`❌ [Service] 도면을 찾을 수 없습니다: ID ${id}`);
+      this.logger.error(`❌ [Service] 도면을 찾을 수 없습니다: ID ${id}`);
       return;
     }
 
-    // 2. Redis 큐에 변환 작업 추가
     try {
       const startTime = Date.now();
       await this.conversionQueue.add('convert', {
@@ -167,14 +183,14 @@ export class DrawingsService {
         removeOnComplete: true 
       });
 
-      console.log(`📡 [${params.mode}] 큐 전송 완료 (ID: ${id})`);
+      this.logger.log(`📡 [${params.mode}] 큐 전송 완료 (ID: ${id})`);
     } catch (error) {
-      console.error('❌ Redis 작업 추가 실패:', error);
+      this.logger.error('❌ Redis 작업 추가 실패:', error);
     }
   }
 
   async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED') {
-    console.log(`[Status Update] ID: ${id} -> ${status}`);
+    this.logger.log(`[Status Update] ID: ${id} -> ${status}`);
 
     await this.drizzle.db
       .update(drawings)
@@ -182,26 +198,22 @@ export class DrawingsService {
       .where(eq(drawings.id, id));
 
     if (status === 'COMPLETED') {
-      console.log(`[WebSocket] ${id}번 도면 변환 완료 신호 발송!`);
+      this.logger.log(`[WebSocket] ${id}번 도면 변환 완료 신호 발송!`);
       this.drawingsGateway.sendUpdateNotification(id);
     }
   }
 
   async create(fileName: string, filePath: string) {
-    // 1. DB 저장
     const result = await this.drizzle.db.insert(drawings).values({
       fileName: fileName,
       originalUrl: filePath,
       status: 'PENDING',
     });
   
-    console.log('DB Insert Result:', result);
-    
     const drawingId = (result as any)[0].insertId; 
     const startTime = Date.now();
 
-    // 2. Redis에 넣기 전 로그
-    console.log(`Attempting to add job to Redis: drawingId=${drawingId}`);
+    this.logger.log(`Attempting to add job to Redis: drawingId=${drawingId}`);
   
     try {
       const job = await this.conversionQueue.add('convert', {
@@ -209,9 +221,9 @@ export class DrawingsService {
         filePath: filePath,
         startTime,
       });
-      console.log('✅ Job added to Redis successfully! Job ID:', job.id);
+      this.logger.log(`✅ Job added to Redis successfully! Job ID: ${job.id}`);
     } catch (error) {
-      console.error('❌ Failed to add job to Redis:', error);
+      this.logger.error('❌ Failed to add job to Redis:', error);
     }
   
     return { 
