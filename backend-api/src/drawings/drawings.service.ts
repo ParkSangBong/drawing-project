@@ -80,27 +80,106 @@ export class DrawingsService {
   }
 
   // 👇 [변경] Gemini 3 API 호출 방식 (핵심 변경 구간)
+  // private async analyzeImage(imageBuffer: Buffer): Promise<any> {
+  //   const base64Image = imageBuffer.toString('base64');
+
+  //   const prompt = `
+  //     You are an expert mechanical engineer. Analyze this technical drawing image.
+  //     Extract geometric shapes and dimensions.
+      
+  //     Return ONLY a raw JSON object with this structure:
+  //     {
+  //       "elements": [
+  //         { "type": "CIRCLE", "x": 0, "y": 0, "r": 10 },
+  //         { "type": "LINE", "x1": 0, "y1": 0, "x2": 10, "y2": 0 },
+  //         { "type": "TEXT", "x": 5, "y": 5, "content": "M10", "height": 5 }
+  //       ]
+  //     }
+  //     Coordinates Guide: Assume bottom-left of the main object is (0,0).
+  //   `;
+
+  //   // 👇 [변경] GoogleGenAI v1beta (Gemini 3) 호출 문법
+  //   const response = await this.genAI.models.generateContent({
+  //     model: "gemini-3-flash-preview", // 👈 아까 확인한 최신 모델명!
+  //     contents: [
+  //       {
+  //         parts: [
+  //           { text: prompt },
+  //           { 
+  //             inlineData: { 
+  //               mimeType: "image/jpeg", 
+  //               data: base64Image 
+  //             } 
+  //           }
+  //         ]
+  //       }
+  //     ],
+  //     // 👇 [신규] JSON 모드 강제 (Gemini 3 기능)
+  //     config: {
+  //       responseMimeType: "application/json", 
+  //     }
+  //   });
+
+  //   // 👇 [변경] 응답 데이터 추출 (response.text)
+  //   let text = response.text;
+
+  //   if (!text) {
+  //     throw new Error('Gemini가 텍스트를 반환하지 않았습니다. (Empty Response)');
+  //   } else {
+  //     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  //   }
+    
+  //   // // 안전장치: 혹시 모를 마크다운 제거
+  //   // if (text) {
+  //   //     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  //   // }
+    
+  //   return JSON.parse(text);
+  // }
+
+  // backend-api/src/drawings/drawings.service.ts
+
   private async analyzeImage(imageBuffer: Buffer): Promise<any> {
     const base64Image = imageBuffer.toString('base64');
 
+    // 👇 [수정] 프롬프트를 훨씬 구체적이고 강력하게 업그레이드했습니다.
     const prompt = `
-      You are an expert mechanical engineer. Analyze this technical drawing image.
-      Extract geometric shapes and dimensions.
+      Role: You are a Senior Mechanical Design Engineer & CAD Expert.
+      Task: Convert this hand-drawn mechanical sketch into a precise 2D DXF coordinate set.
       
-      Return ONLY a raw JSON object with this structure:
+      [Critical Analysis Rules]
+      1. **Orthographic Projection**: Recognize that this image likely contains multiple views (e.g., Top View, Front View) of the SAME part. Align them vertically or horizontally.
+      2. **Shape correction**: 
+         - A rough circle clearly drawn as a fastener head is a CIRCLE.
+         - A rough polygon clearly drawn as a nut/bolt head is a POLYGON (likely Hexagon). Do NOT simplify a hexagon into a circle.
+         - Rough lines clearly meant to be straight must be perfectly STRAIGHT lines (axis-aligned if applicable).
+      3. **Centerlines**: Identifying the center axis is crucial. All cylindrical parts must be aligned to this axis.
+      4. **Details**:
+         - Recognize 'X' or cross-hatching patterns inside a rectangle as a "Section View" or solid material -> Draw the boundary box.
+         - Recognize dotted lines as "Hidden Lines".
+      
+      [Extraction Requirements]
+      Extract ALL geometric elements.
+      - If you see a Hexagon, compose it using 6 LINE elements.
+      - Convert handwritten dimensions (e.g., "37", "M10") into TEXT elements placed near their reference.
+      
+      Return ONLY a raw JSON object with this strict structure:
       {
         "elements": [
-          { "type": "CIRCLE", "x": 0, "y": 0, "r": 10 },
-          { "type": "LINE", "x1": 0, "y1": 0, "x2": 10, "y2": 0 },
-          { "type": "TEXT", "x": 5, "y": 5, "content": "M10", "height": 5 }
+          { "type": "CIRCLE", "x": 100, "y": 100, "r": 20 },
+          { "type": "LINE", "x1": 0, "y1": 0, "x2": 100, "y2": 0 },
+          { "type": "TEXT", "x": 50, "y": 50, "content": "M10", "height": 5 }
         ]
       }
-      Coordinates Guide: Assume bottom-left of the main object is (0,0).
+      
+      [Coordinate System]
+      - Use a Cartesian coordinate system relative to the image pixels.
+      - Invert Y-axis if necessary so the drawing is upright.
+      - Ensure the "Top View" is placed above the "Front View".
     `;
 
-    // 👇 [변경] GoogleGenAI v1beta (Gemini 3) 호출 문법
     const response = await this.genAI.models.generateContent({
-      model: "gemini-3-flash-preview", // 👈 아까 확인한 최신 모델명!
+      model: "gemini-3-flash-preview", 
       contents: [
         {
           parts: [
@@ -114,13 +193,11 @@ export class DrawingsService {
           ]
         }
       ],
-      // 👇 [신규] JSON 모드 강제 (Gemini 3 기능)
       config: {
         responseMimeType: "application/json", 
       }
     });
 
-    // 👇 [변경] 응답 데이터 추출 (response.text)
     let text = response.text;
 
     if (!text) {
@@ -128,11 +205,8 @@ export class DrawingsService {
     } else {
       text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     }
-    
-    // // 안전장치: 혹시 모를 마크다운 제거
-    // if (text) {
-    //     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    // }
+
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
     return JSON.parse(text);
   }
