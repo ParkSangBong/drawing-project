@@ -139,43 +139,209 @@ export class DrawingsService {
 
   // backend-api/src/drawings/drawings.service.ts
 
+  // private async analyzeImage(imageBuffer: Buffer): Promise<any> {
+  //   const base64Image = imageBuffer.toString('base64');
+
+  //   // 👇 [수정] 프롬프트를 훨씬 구체적이고 강력하게 업그레이드했습니다.
+  //   const prompt = `
+  //     Role: You are a Senior Mechanical Design Engineer & CAD Expert.
+  //     Task: Convert this hand-drawn mechanical sketch into a precise 2D DXF coordinate set.
+      
+  //     [Critical Analysis Rules]
+  //     1. **Orthographic Projection**: Recognize that this image likely contains multiple views (e.g., Top View, Front View) of the SAME part. Align them vertically or horizontally.
+  //     2. **Shape correction**: 
+  //        - A rough circle clearly drawn as a fastener head is a CIRCLE.
+  //        - A rough polygon clearly drawn as a nut/bolt head is a POLYGON (likely Hexagon). Do NOT simplify a hexagon into a circle.
+  //        - Rough lines clearly meant to be straight must be perfectly STRAIGHT lines (axis-aligned if applicable).
+  //     3. **Centerlines**: Identifying the center axis is crucial. All cylindrical parts must be aligned to this axis.
+  //     4. **Details**:
+  //        - Recognize 'X' or cross-hatching patterns inside a rectangle as a "Section View" or solid material -> Draw the boundary box.
+  //        - Recognize dotted lines as "Hidden Lines".
+      
+  //     [Extraction Requirements]
+  //     Extract ALL geometric elements.
+  //     - If you see a Hexagon, compose it using 6 LINE elements.
+  //     - Convert handwritten dimensions (e.g., "37", "M10") into TEXT elements placed near their reference.
+      
+  //     Return ONLY a raw JSON object with this strict structure:
+  //     {
+  //       "elements": [
+  //         { "type": "CIRCLE", "x": 100, "y": 100, "r": 20 },
+  //         { "type": "LINE", "x1": 0, "y1": 0, "x2": 100, "y2": 0 },
+  //         { "type": "TEXT", "x": 50, "y": 50, "content": "M10", "height": 5 }
+  //       ]
+  //     }
+      
+  //     [Coordinate System]
+  //     - Use a Cartesian coordinate system relative to the image pixels.
+  //     - Invert Y-axis if necessary so the drawing is upright.
+  //     - Ensure the "Top View" is placed above the "Front View".
+  //   `;
+
+  //   const response = await this.genAI.models.generateContent({
+  //     model: "gemini-3-flash-preview", 
+  //     contents: [
+  //       {
+  //         parts: [
+  //           { text: prompt },
+  //           { 
+  //             inlineData: { 
+  //               mimeType: "image/jpeg", 
+  //               data: base64Image 
+  //             } 
+  //           }
+  //         ]
+  //       }
+  //     ],
+  //     config: {
+  //       responseMimeType: "application/json", 
+  //     }
+  //   });
+
+  //   let text = response.text;
+
+  //   if (!text) {
+  //     throw new Error('Gemini가 텍스트를 반환하지 않았습니다. (Empty Response)');
+  //   } else {
+  //     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  //   }
+
+  //   text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+  //   return JSON.parse(text);
+  // }
+
+  // backend-api/src/drawings/drawings.service.ts
+
+  // private async analyzeImage(imageBuffer: Buffer): Promise<any> {
+  //   const base64Image = imageBuffer.toString('base64');
+
+  //   // 👇 [변경] AI를 '단순 화가'에서 'CAD 설계자'로 승격시키는 프롬프트
+  //   const prompt = `
+  //     Role: Senior Mechanical Design Engineer.
+  //     Task: Reverse-engineer this hand-drawn sketch into a PRECISE technical drawing (DXF format).
+      
+  //     [CRITICAL RULES - Do Not Just Trace]
+  //     1. **Geometric Correction**: 
+  //        - Hand-drawn lines are never perfect. You MUST output PERFECTLY STRAIGHT lines and PERFECT CIRCLES.
+  //        - If a shape looks like a polygon (e.g., Nut Head), draw a PERFECT HEXAGON (6 lines), even if the sketch is round.
+      
+  //     2. **Read the Engineering Intent**:
+  //        - Read the handwritten text.
+  //        - If text says "Hex" or shows a nut, the Top View MUST be a Hexagon inside a Circle.
+  //        - If text says "Section" or you see cross pattern, draw Diagonal Hatching Lines (////) in the Front View.
+      
+  //     3. **Alignment & Projection**:
+  //        - The Top View and Front View MUST be aligned vertically (share the same Center X).
+  //        - Do not treat them as separate drawings. They are ONE part.
+      
+  //     [Output Schema]
+  //     Return ONLY a JSON object with this structure. 
+  //     Use "description" to explain what part it is (e.g., "Bolt Head", "Hatching").
+      
+  //     {
+  //       "elements": [
+  //         { "type": "LINE", "x1": 0, "y1": 0, "x2": 100, "y2": 0, "description": "Base Line" },
+  //         { "type": "CIRCLE", "x": 50, "y": 50, "r": 20, "description": "Outer Diameter" }
+  //         // Generate lines for Hexagon and Hatching as well
+  //       ]
+  //     }
+  //   `;
+
+  //   const response = await this.genAI.models.generateContent({
+  //     model: "gemini-3-flash-preview", // 만약 계속 503 에러나면 "gemini-1.5-pro"로 변경 고려
+  //     contents: [
+  //       {
+  //         parts: [
+  //           { text: prompt },
+  //           { 
+  //             inlineData: { 
+  //               mimeType: "image/jpeg", 
+  //               data: base64Image 
+  //             } 
+  //           }
+  //         ]
+  //       }
+  //     ],
+  //     config: {
+  //       responseMimeType: "application/json", 
+  //     }
+  //   });
+
+  //   let text = response.text;
+
+  //   if (!text) {
+  //     throw new Error('Gemini가 텍스트를 반환하지 않았습니다. (Empty Response)');
+  //   } else {
+  //     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  //   }
+
+  //   text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+  //   return JSON.parse(text);
+  // }
+
+  // backend-api/src/drawings/drawings.service.ts
+
   private async analyzeImage(imageBuffer: Buffer): Promise<any> {
     const base64Image = imageBuffer.toString('base64');
 
-    // 👇 [수정] 프롬프트를 훨씬 구체적이고 강력하게 업그레이드했습니다.
+    // 💡 [핵심] 'after.jpg'의 특징을 JSON 예시로 만들어서 프롬프트에 심었습니다.
+    const perfectExample = {
+      elements: [
+        // 1. 평면도 (Top View): 원 안에 육각형이 있는 형태
+        { type: "CIRCLE", x: 200, y: 100, r: 28, description: "Top View - Outer Circle (Φ28)" },
+        { type: "LINE", x1: 186, y1: 100, x2: 193, y2: 112, description: "Top View - Hexagon Edge 1" },
+        { type: "LINE", x1: 193, y1: 112, x2: 207, y2: 112, description: "Top View - Hexagon Edge 2" },
+        // ... (육각형 나머지 선들) ...
+        
+        // 2. 정면도 (Front View): 단면 빗금(Hatching)이 있는 형태
+        { type: "LINE", x1: 172, y1: 200, x2: 228, y2: 200, description: "Front View - Top Edge" },
+        { type: "LINE", x1: 172, y1: 200, x2: 172, y2: 237, description: "Front View - Left Edge (Height 37)" },
+        { type: "LINE", x1: 175, y1: 205, x2: 185, y2: 215, description: "Hatching Line (Diagonal)" },
+        { type: "LINE", x1: 180, y1: 205, x2: 190, y2: 215, description: "Hatching Line (Diagonal)" },
+        
+        // 3. 치수 텍스트
+        { type: "TEXT", x: 230, y: 218, content: "37", height: 3.5, description: "Height Dimension" },
+        { type: "TEXT", x: 200, y: 80, content: "M10", height: 3.5, description: "Inner Thread Spec" }
+      ]
+    };
+
     const prompt = `
-      Role: You are a Senior Mechanical Design Engineer & CAD Expert.
-      Task: Convert this hand-drawn mechanical sketch into a precise 2D DXF coordinate set.
+      Role: Expert Senior Mechanical Drafter.
+      Task: Reverse-engineer the attached hand-drawn sketch into a PROFESSIONAL CAD drawing (DXF data).
       
-      [Critical Analysis Rules]
-      1. **Orthographic Projection**: Recognize that this image likely contains multiple views (e.g., Top View, Front View) of the SAME part. Align them vertically or horizontally.
-      2. **Shape correction**: 
-         - A rough circle clearly drawn as a fastener head is a CIRCLE.
-         - A rough polygon clearly drawn as a nut/bolt head is a POLYGON (likely Hexagon). Do NOT simplify a hexagon into a circle.
-         - Rough lines clearly meant to be straight must be perfectly STRAIGHT lines (axis-aligned if applicable).
-      3. **Centerlines**: Identifying the center axis is crucial. All cylindrical parts must be aligned to this axis.
-      4. **Details**:
-         - Recognize 'X' or cross-hatching patterns inside a rectangle as a "Section View" or solid material -> Draw the boundary box.
-         - Recognize dotted lines as "Hidden Lines".
+      [LEARNING FROM EXAMPLES (Few-Shot Learning)]
+      I will show you how to convert a sketch into a perfect drawing.
       
-      [Extraction Requirements]
-      Extract ALL geometric elements.
-      - If you see a Hexagon, compose it using 6 LINE elements.
-      - Convert handwritten dimensions (e.g., "37", "M10") into TEXT elements placed near their reference.
+      **Example Input (Mental Image):** A rough hand sketch of a Hexagon Nut. Lines are wobbly, circles are not round.
+      Text "M10" and "37" is written messily.
       
-      Return ONLY a raw JSON object with this strict structure:
-      {
-        "elements": [
-          { "type": "CIRCLE", "x": 100, "y": 100, "r": 20 },
-          { "type": "LINE", "x1": 0, "y1": 0, "x2": 100, "y2": 0 },
-          { "type": "TEXT", "x": 50, "y": 50, "content": "M10", "height": 5 }
-        ]
-      }
+      **Example Ideal Output (The standard you must follow):**
+      ${JSON.stringify(perfectExample)}
       
-      [Coordinate System]
-      - Use a Cartesian coordinate system relative to the image pixels.
-      - Invert Y-axis if necessary so the drawing is upright.
-      - Ensure the "Top View" is placed above the "Front View".
+      ----------------------------------------------------------------
+      
+      [YOUR MISSION]
+      Now, analyze the ATTACHED IMAGE and generate JSON with the same high quality.
+      
+      [STRICT RULES for RECONSTRUCTION]
+      1. **Hexagon Recognition**: 
+         - If the sketch implies a nut/bolt head, draw a PERFECT HEXAGON (6 connected lines), even if the sketch looks like a circle.
+         - Do NOT simplify it.
+      
+      2. **Hatching (Section View)**:
+         - If you see a cross/X pattern or "Section" text, draw multiple diagonal lines (////) to represent solid material.
+      
+      3. **Alignment**:
+         - The Top View (Circle/Hex) must be vertically aligned with the Front View (Rectangle).
+         - They share the same Center X coordinate.
+         
+      4. **Real Dimensions**:
+         - Read numbers like "37", "28", "10". 
+         - Scale your drawing coordinates to match these relative proportions approximately.
+      
+      Return ONLY the raw JSON object.
     `;
 
     const response = await this.genAI.models.generateContent({
@@ -199,13 +365,13 @@ export class DrawingsService {
     });
 
     let text = response.text;
-
     if (!text) {
       throw new Error('Gemini가 텍스트를 반환하지 않았습니다. (Empty Response)');
     } else {
       text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     }
-
+    
+    // 마크다운 제거
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
     return JSON.parse(text);
