@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);  
@@ -11,6 +12,8 @@ async function bootstrap() {
 
     const rawFrontendUrls = configService.get('FRONTEND_URL') || 'http://localhost:3001';
     const allowedOrigins = rawFrontendUrls.split(',');
+
+    app.useGlobalPipes(new ZodValidationPipe());
 
     app.enableCors({
         origin: (origin, callback) => {

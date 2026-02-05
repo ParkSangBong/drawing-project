@@ -1,10 +1,11 @@
-import { Controller, Post, Get, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Get, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import { DrawingsService } from './drawings.service';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { CreateDrawingDto } from './dto/create-drawing.dto';
 
 @ApiTags('Drawings (도면 관리)')
 @Controller('drawings')
@@ -37,7 +38,10 @@ export class DrawingsController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
-      type: 'object', properties: { file: { type: 'string', format: 'binary' } },
+      type: 'object', properties: { 
+        file: { type: 'string', format: 'binary' },
+        fileName: { type: 'string', example: 'my_drawing' }, 
+      },
     },
   })
   @UseInterceptors(
@@ -52,7 +56,7 @@ export class DrawingsController {
       }),
     }),
   )
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @Body() dto: CreateDrawingDto) {
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     
     console.log('디코딩된 파일명:', originalName); 
