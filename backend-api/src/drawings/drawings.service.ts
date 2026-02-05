@@ -58,7 +58,7 @@ export class DrawingsService {
     private readonly configService: ConfigService,
   ) {
     // 🛠️ API Key 설정
-    const apiKey = "AIzaSyAORVgdDZ91d9hx_MjmFzJ4wB2RyJ5yJIY"; // Key 유지
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
 
     if (!apiKey) {
       this.logger.warn('⚠️ GEMINI_API_KEY가 설정되지 않았습니다.');
