@@ -193,25 +193,52 @@ export class DrawingsService {
       return;
     }
 
+    // try {
+    //   const startTime = Date.now();
+    //   await this.conversionQueue.add('convert', {
+    //     drawingId: id,
+    //     filePath: drawing.originalUrl,
+    //     startTime,
+    //     ...params 
+    //   }, { 
+    //     jobId: `${params.mode}-${id}-${startTime}`, 
+    //     removeOnComplete: true 
+    //   });
+
+    //   this.logger.log(`📡 [${params.mode}] 큐 전송 완료 (ID: ${id})`);
     try {
       const startTime = Date.now();
       await this.conversionQueue.add('convert', {
         drawingId: id,
         filePath: drawing.originalUrl,
         startTime,
+        socketId: params.socketId, // 🚀 [추가] Gateway에서 넘겨준 socketId를 큐에 넣음
         ...params 
       }, { 
-        jobId: `${params.mode}-${id}-${startTime}`, 
-        removeOnComplete: true 
+        // ... 생략
       });
 
-      this.logger.log(`📡 [${params.mode}] 큐 전송 완료 (ID: ${id})`);
+      this.logger.log(`📡 [${params.mode}] 큐 전송 완료 (유저: ${params.socketId})`);
     } catch (error) {
       this.logger.error('❌ Redis 작업 추가 실패:', error);
     }
   }
 
-  async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED') {
+  // async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED', socketId?: string) {
+  //   this.logger.log(`[Status Update] ID: ${id} -> ${status}`);
+
+  //   await this.drizzle.db
+  //     .update(drawings)
+  //     .set({ status: status })
+  //     .where(eq(drawings.id, id));
+
+  //   if (status === 'COMPLETED') {
+  //     this.logger.log(`[WebSocket] ${id}번 도면 변환 완료 신호 발송!`);
+  //     this.drawingsGateway.sendUpdateNotification(id);
+  //   }
+  // }
+
+  async updateStatus(id: number, status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED', socketId?: string) {
     this.logger.log(`[Status Update] ID: ${id} -> ${status}`);
 
     await this.drizzle.db
@@ -220,8 +247,9 @@ export class DrawingsService {
       .where(eq(drawings.id, id));
 
     if (status === 'COMPLETED') {
-      this.logger.log(`[WebSocket] ${id}번 도면 변환 완료 신호 발송!`);
-      this.drawingsGateway.sendUpdateNotification(id);
+      this.logger.log(`[WebSocket] ${id}번 도면 완료 신호 발송 (대상: ${socketId || 'All'})`);
+      // 🚀 [수정] 인자에 socketId 추가
+      this.drawingsGateway.sendUpdateNotification(id, socketId);
     }
   }
 

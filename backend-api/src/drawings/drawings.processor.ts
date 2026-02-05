@@ -43,14 +43,27 @@ export class DrawingResultsProcessor extends WorkerHost {
       console.warn(`⚠️ [성능 데이터 누락] ID: ${drawingId} 작업에 startTime이 없습니다.`);
     }
 
+    
+
+    // if (status === 'PREVIEW_READY') {
+    //   // 🚀 [핵심] 파이썬이 만든 미리보기 주소를 프론트엔드에 즉시 전송
+    //   this.drawingsGateway.server.emit('previewReady', {
+    //     drawingId,
+    //     previewUrl,
+    //     extractedDimensions,
+    //   });
+    //   console.log(`✅ 프론트엔드로 미리보기 알림 발송 완료`);
     if (status === 'PREVIEW_READY') {
-      // 🚀 [핵심] 파이썬이 만든 미리보기 주소를 프론트엔드에 즉시 전송
-      this.drawingsGateway.server.emit('previewReady', {
+      // 🚀 [수정] 전체 방송(emit) 대신, 특정 유저에게만 보냅니다.
+      // job.data에 socketId가 포함되어 있어야 합니다. (아래 Service 수정 참고)
+      const { socketId } = job.data; 
+      
+      this.drawingsGateway.sendPreviewReady(socketId, {
         drawingId,
         previewUrl,
         extractedDimensions,
       });
-      console.log(`✅ 프론트엔드로 미리보기 알림 발송 완료`);
+      console.log(`✅ [${socketId}] 유저에게 미리보기 알림 발송 완료`);
     } else {
       // 기존 최종 완료 처리 (COMPLETED 등)
       await this.drawingsService.updateStatus(drawingId, status);
