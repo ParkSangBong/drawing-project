@@ -82,7 +82,7 @@ flowchart TD
 ### 1. 비동기 처리 (NestJS + BullMQ + Redis)
 Problem: 고해상도 도면을 AI로 변환하는 데 수십 초가 소요되어, 일반적인 HTTP 요청 시 타임아웃이 발생했습니다.
 
-Solution: 작업을 Redis Queue에 넣고 서버는 즉시 응답(202 Accepted)을 반환합니다. 작업이 완료되면 Socket.io를 통해 클라이언트에게 푸시 알림을 보내 사용자가 기다리지 않게 했습니다.
+Solution: 작업을 Redis Queue에 넣고 서버는 즉시 응답을 반환합니다. 작업이 완료되면 Socket.io를 통해 클라이언트에게 푸시 알림을 보내 사용자가 기다리지 않게 했습니다.
 
 ### 2. Docker Shared Volume 활용
 Problem: 백엔드 컨테이너(Node.js)가 업로드한 이미지를 엔진 컨테이너(Python)가 읽어야 하는데, 네트워크로 대용량 파일을 전송하는 것은 비효율적이었습니다.
