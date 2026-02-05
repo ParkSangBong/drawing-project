@@ -66,7 +66,9 @@ export class DrawingResultsProcessor extends WorkerHost {
       console.log(`✅ [${socketId}] 유저에게 미리보기 알림 발송 완료`);
     } else {
       // 기존 최종 완료 처리 (COMPLETED 등)
-      await this.drawingsService.updateStatus(drawingId, status);
+      const { socketId } = job.data; 
+      await this.drawingsService.updateStatus(drawingId, status, socketId);
+      // await this.drawingsService.updateStatus(drawingId, status);
     }
 
     // // DB 상태 업데이트

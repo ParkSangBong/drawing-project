@@ -34,6 +34,7 @@ async def process_drawing(job, job_id):
     data = job.data
 
     start_time = data.get('startTime')
+    socket_id = data.get('socketId')
 
     # 🚀 수정: 환경 변수 기반 경로 설정
     input_path = os.path.join(BACKEND_API_BASE_PATH, data['filePath'])
@@ -114,6 +115,7 @@ async def process_drawing(job, job_id):
                 "previewUrl": preview_path.replace(BACKEND_API_BASE_PATH + "/", ""),
                 "extractedDimensions": dimensions,
                 "startTime": start_time,
+                "socketId": socket_id
             })
             print(f"✨ [미리보기 생성 완료] 결과 전송 완료 (ID: {job_id})")
 
@@ -146,6 +148,7 @@ async def process_drawing(job, job_id):
                 "status": "COMPLETED", 
                 "resultUrl": output_dxf_path.replace(BACKEND_API_BASE_PATH + "/", ""),
                 "startTime": start_time,
+                "socketId": socket_id
             })
             print(f"✨ [최종 변환 완료] DXF 저장 및 신호 전송 완료 (ID: {job_id})")
 
