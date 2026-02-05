@@ -83,8 +83,10 @@ services:
       - '443:443'
       - '81:81'
     volumes:
-      - ./npm/data:/data
-      - ./npm/letsencrypt:/etc/letsencrypt
+      # - ./npm/data:/data
+      # - ./npm/letsencrypt:/etc/letsencrypt
+      - /mnt/c/docker-data/npm/data:/data
+      - /mnt/c/docker-data/npm/letsencrypt:/etc/letsencrypt
 
 volumes:
   db_data:

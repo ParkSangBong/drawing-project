@@ -16,6 +16,9 @@ jobs:
       - name: 코드 내려받기 (Checkout)
         uses: actions/checkout@v3
 
+      # ----------------------------------------------------------------
+      # [1] 환경 변수 생성 단계 (기존 로직 100% 유지)
+      # ----------------------------------------------------------------
       - name: Create Root .env
         run: |
           $content = @"
@@ -31,7 +34,6 @@ jobs:
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           "@
           
-          # [중요] BOM(서명) 없는 UTF-8로 강제 저장하는 .NET 명령어입니다.
           $enc = New-Object System.Text.UTF8Encoding $false
           [System.IO.File]::WriteAllText(".env", $content, $enc)
 
@@ -74,10 +76,23 @@ jobs:
           $enc = New-Object System.Text.UTF8Encoding $false
           [System.IO.File]::WriteAllText("drawing-engine/.env", $content, $enc)
 
-      - name: Run Docker Compose via WSL
+      # ----------------------------------------------------------------
+      # [2] 배포 및 실행 단계 (이 부분이 강력하게 수정되었습니다!)
+      # ----------------------------------------------------------------
+      - name: Run Docker Compose via WSL (With Auto-Fix)
         run: |
-          Write-Host "Shutting down existing containers via WSL..."
-          wsl docker-compose down --remove-orphans
+          Write-Host "🧹 1. Shutting down existing containers and removing orphans..."
+          # 기존 컨테이너를 내리고, 연결된 컨테이너들도 정리합니다.
+          wsl docker compose down --remove-orphans
           
-          Write-Host "Building and starting containers via WSL..."
-          wsl docker-compose up -d --build
+          Write-Host "🧹 2. Pruning Docker System to fix 'mkdir file exists' error..."
+          # [핵심] 시스템 찌꺼기를 강제로 지워서 꼬인 마운트 정보를 초기화합니다.
+          wsl docker system prune -f
+          
+          Write-Host "🚀 3. Building and starting containers..."
+          # 깨끗한 상태에서 다시 빌드하고 실행합니다.
+          wsl docker compose up -d --build
+          
+          Write-Host "✅ Deployment Completed. Checking status..."
+          Start-Sleep -Seconds 5
+          wsl docker compose ps
