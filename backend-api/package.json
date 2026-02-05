@@ -35,6 +35,7 @@
     "drizzle-orm": "^0.45.1",
     "dxf-writer": "^1.18.4",
     "mysql2": "^3.16.0",
+    "nestjs-zod": "^5.1.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
