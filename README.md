@@ -1,196 +1,174 @@
-# 🎨 실시간 손도면 캐드 변환 플랫폼 (Drawing to CAD)
+# 🏗️ AI 기반 수기 도면 CAD 자동 변환 플랫폼 (Drawing to CAD)
 
-어머님의 설계 작업을 돕기 위해 시작된, 수기 도면을 디지털 벡터 데이터로 변환하는 실시간 웹 서비스입니다.
+## 🔗 Live Service
+서비스가 현재 운영 중입니다. 아래 링크를 클릭하여 직접 체험해 보세요.
 
-## 🚀 주요 성과 (Key Achievements)
+| **Web Dashboard** | **API Documentation** |
+| :---: | :---: |
+| [**https://quitelog.com**](https://quitelog.com) | [**https://api.quitelog.com/api**](https://api.quitelog.com/api) |
 
-### 1. 실시간 비동기 아키텍처 구축
-- **WebSocket (Socket.io)**: Polling 방식을 제거하고 서버 푸시 기술을 도입하여 변환 완료 시 0초 지연 알림 구현.
-- **BullMQ & Redis**: NestJS와 Python 엔진 간의 작업 큐를 관리하여 안정적인 분산 처리 환경 구축.
+<br/>
 
-- **Why?**: (BullMQ 도입 이유 추가) 무거운 이미지 처리 작업을 메인 API 서버와 분리하여 처리함으로써, 변환 중에도 사용자가 대시보드의 다른 기능을 끊김 없이 이용할 수 있는 응답성을 확보했습니다.
+> **"아날로그 도면을 디지털의 세상으로."** > 어머니의 반복적인 수기 도면 작업을 자동화하기 위해 개발된 **Generative AI 기반 도면 변환 웹 서비스**입니다.
 
-### 2. 이미지 처리 및 벡터화 엔진 (Python & OpenCV)
-- **Adaptive Thresholding**: 조명 및 배경 노이즈(격자 무늬 등)를 효과적으로 제거하는 알고리즘 적용.
-- **Buffer-based Encoding**: 웹 환경에서 발생하는 한글 파일명 깨짐 문제를 바이너리 버퍼 변환으로 완벽 해결.
+[![Stack](https://img.shields.io/badge/Tech-Next.js%2015%20%7C%20NestJS%20%7C%20Python-black?style=flat-square)]()
+[![Infra](https://img.shields.io/badge/Infra-Docker%20Compose%20%7C%20Nginx%20Proxy%20Manager-blue?style=flat-square)]()
+[![Database](https://img.shields.io/badge/DB-MySQL%208.0%20%7C%20Redis-red?style=flat-square)]()
 
-### 3. 사용자 중심 UI/UX
-- **Interactive Preview**: 파일 업로드 즉시 브라우저 내 미리보기 제공.
-- **Dark Mode Dashboard**: 장시간 작업 시 피로도를 줄이기 위한 다크 테마 및 실시간 상태 스피너 적용.
+
+## 📖 프로젝트 배경 및 진화 (Project Evolution)
+
+### 0. 개발 동기
+어머니께서 설계 업무 중 종이에 그려진 도면을 다시 CAD로 옮겨 그리는 단순 반복 작업에 많은 시간을 쏟으시는 것을 보았습니다. 
+
+### 1. 시작: 아날로그의 불편함
+어머니께서 종이 도면을 스캔하고, 캐드(CAD) 프로그램 위에서 선을 하나하나 다시 그리는 단순 반복 작업에 많은 시간을 쏟으시는 것을 보았습니다. 이를 자동화하기 위해 프로젝트를 시작했습니다.
+
+### 2. V1: OpenCV 기반 엔진 (Legacy)
+초기에는 컴퓨터 비전 기술(OpenCV)을 활용하여 이미지의 경계선(Edge)을 따는 방식을 시도했습니다.
+- **방식**: Canny Edge Detection & Adaptive Thresholding 적용.
+- **한계**: 도면의 얼룩이나 그림자(노이즈)를 벽체로 오인하거나, 손글씨로 적힌 치수(Text)를 선으로 인식하여 데이터가 훼손되는 문제가 발생했습니다.
+
+### 3. V2: Generative AI 도입 (Current)
+단순한 기하학적 계산을 넘어, 도면의 **맥락(Context)**을 이해하기 위해 **Google Gemini 3 Flash**를 도입했습니다.
+- **개선점**: AI가 벽체, 창문, 텍스트를 구분하여 인식하므로 노이즈에 강하며, 손글씨 치수까지 디지털 텍스트로 변환이 가능해졌습니다.
+- **하이브리드 아키텍처 (Hybrid Pipeline)**:
+    - **Python (OpenCV)**: CPU 연산이 필요한 이미지 전처리(노이즈 제거, 이진화)를 전담하여 처리 속도 확보.
+    - **NestJS (AI Orchestration)**: 전처리된 이미지를 Gemini API로 전송하고 결과를 파싱하여 DB에 저장.
+
+---
 
 ## 🛠 Tech Stack
-- **Frontend**: Next.js, TypeScript, Socket.io-client
-- **Backend**: NestJS, Drizzle ORM, BullMQ, Socket.io
-- **Engine**: Python, OpenCV, Redis
-- **Database**: MySQL (utf8mb4 환경 최적화)
-- **Infra**: Docker Compose, Nginx Proxy Manager (SSL)
 
-💡 기술 선택 이유 (Engineering Decision)
+| Category | Technology | Usage |
+| :--- | :--- | :--- |
+| **Frontend** | **Next.js 15, TypeScript** | App Router 기반의 대시보드 및 실시간 미리보기 UI |
+| **Backend** | **NestJS** | REST API, Gemini API 연동, BullMQ(큐) 관리, Socket.io |
+| **Engine** | **Python 3.11** | OpenCV 기반 이미지 전처리 (노이즈 제거, 이진화) |
+| **Database** | **MySQL 8.0** | 사용자 데이터 및 도면 메타데이터 저장 (Drizzle ORM 사용) |
+| **Queue** | **Redis** | 백엔드와 파이썬 엔진 간의 비동기 메시지 브로커 |
+| **Infra** | **Docker Compose** | 전체 마이크로서비스 오케스트레이션 |
+| **Proxy** | **Nginx Proxy Manager** | 리버스 프록시 및 SSL 인증서 관리 (Let's Encrypt) |
 
-Drizzle ORM: Type-safety를 완벽히 보장하면서도, Prisma 대비 가벼운 런타임 성능을 유지하기 위해 선택했습니다.
+---
 
-Shared Volume: 컨테이너 간 대용량 이미지 데이터를 네트워크 전송 비용 없이 효율적으로 공유하기 위해 Docker Volume 전략을 활용했습니다.
-
-## 🏗️ 시스템 아키텍처 (System Architecture)
-이 프로젝트는 단일 서버 구조를 넘어, 각 서비스가 컨테이너로 격리된 마이크로서비스 지향 아키텍처로 설계되었습니다.
+## 🏗️ 시스템 아키텍처 (Architecture)
 
 ```mermaid
-graph TD
-    User((사용자)) -->|HTTPS/443| NPM[Nginx Proxy Manager]
+flowchart TD
+    User((User)) -->|HTTPS| NPM[Nginx Proxy Manager]
     
     subgraph "Docker Internal Network"
-        NPM -->|Proxy| Front[Next.js Frontend]
-        NPM -->|Proxy| Back[NestJS Backend]
-        Back <--> DB[(MySQL)]
-        Back <--> Redis((Redis Queue))
-        Redis <--> Engine[Python Analysis Engine]
+        NPM -->|Reverse Proxy| Front[Next.js Frontend]
+        NPM -->|Reverse Proxy| Back[NestJS Backend]
         
-        Back -.->|Shared Volume| Storage[(Shared Storage)]
+        Back <--> DB[(MySQL 8.0)]
+        
+        %% 괄호 '()'가 파싱 오류를 일으킬 수 있어 제거하거나 이스케이프해야 함
+        Back -.->|API Call HTTP| Gemini[Google Gemini API]
+        
+        %% 라벨 문법 통일 (-->|Text|)
+        Back -->|Preprocessing Job| Redis((Redis Queue))
+        Redis -->|Job Process| Engine[Python OpenCV Engine]
+        
+        %% 파일 공유
+        Back -.->|Shared Volume| Storage[(Local Storage)]
         Engine -.->|Shared Volume| Storage
     end
 ```
 
-## 🛡️ 인프라 및 보안 설계 상세 (Infrastructure Deep Dive)
-- SSL Termination: Nginx Proxy Manager를 도입하여 Let's Encrypt 기반의 전 구간 HTTPS 암호화 통신을 구현했습니다.
+## 💡 핵심 엔지니어링 의사결정 (Engineering Decisions)
 
-- Port Minimization: 외부 개방 포트를 80(HTTP), 443(HTTPS)으로 단일화하여 공격 접점(Attack Surface)을 최소화했습니다.
+### 1. 비동기 처리 (NestJS + BullMQ + Redis)
+Problem: 고해상도 도면을 AI로 변환하는 데 수십 초가 소요되어, 일반적인 HTTP 요청 시 타임아웃이 발생했습니다.
 
-- Network Isolation: DB와 Redis를 외부 노출 없이 내부 네트워크에서만 통신하도록 격리하여 인프라 보안을 강화했습니다.
+Solution: 작업을 Redis Queue에 넣고 서버는 즉시 응답(202 Accepted)을 반환합니다. 작업이 완료되면 Socket.io를 통해 클라이언트에게 푸시 알림을 보내 사용자가 기다리지 않게 했습니다.
 
-- Health Checks & Monitoring:
+### 2. Docker Shared Volume 활용
+Problem: 백엔드 컨테이너(Node.js)가 업로드한 이미지를 엔진 컨테이너(Python)가 읽어야 하는데, 네트워크로 대용량 파일을 전송하는 것은 비효율적이었습니다.
 
-    - docker-compose의 healthcheck 기능을 통해 DB 상태를 실시간 모니터링하며, 서비스 간 실행 순서(depends_on)를 제어해 인프라 가동의 안정성을 확보했습니다.
+Solution: 두 컨테이너가 동일한 호스트 경로를 마운트하도록 Shared Volume을 설정하여, 네트워크 오버헤드 없이(Zero-copy) 파일을 공유했습니다.
 
-    - 백엔드에 Dynamic Origin Logging 시스템을 구축하여, 허용되지 않은 오리진의 접근 시도를 실시간으로 모니터링하고 보안 디버깅을 수행할 수 있는 환경을 마련했습니다.
+## 💣 트러블 슈팅 (Troubleshooting Log)
+실제 배포 및 개발 과정에서 겪은 치명적인 이슈들과 해결 과정입니다.
 
-## 🎯 주요 이슈 해결 (Troubleshooting Chronicle)
-1. 불필요한 네트워크 부하 (Network Optimization)
-    
-    현상: 도면 변환 확인을 위한 3초 주기 Polling이 서버 자원 및 대역폭 낭비 초래.
+### 이슈 1: Docker 환경 변수 우선순위와 DB 접속 거부 (Access Denied)
+상황: docker-compose up 배포 시, 백엔드 컨테이너가 MySQL에 접속하지 못하고 ER_ACCESS_DENIED_ERROR를 발생시키며 무한 재시작됨.
 
-    해결: WebSocket(Socket.io)을 도입하여 변환 완료 시점에만 서버가 클라이언트에게 신호를 보내도록 개선.
+원인: MySQL 컨테이너는 최초 생성 시에만 환경 변수(MYSQL_PASSWORD)를 읽어 데이터베이스를 초기화함.
 
-2. 한글 파일명 깨짐 (Encoding Issue)
+이후 .env 파일의 비밀번호를 변경했지만, Docker Volume에는 여전히 예전 비밀번호로 생성된 데이터가 남아있어 불일치가 발생함.
 
-    현상: Multer를 통해 전달받은 한글 파일명이 latin1으로 해석되어 깨짐 발생.
+해결: 개발 초기 단계이므로 docker compose down -v 명령어를 통해 볼륨 데이터를 포함한 모든 리소스를 초기화하여 해결.
 
-    해결: Buffer.from(file.originalname, 'latin1').toString('utf8')을 통해 원본 바이트 데이터를 UTF-8로 재구성하여 해결했습니다.
+docker-compose.yml에서 백엔드 서비스에 주입되는 환경 변수(DB_PASSWORD)를 명시적으로 선언하여, 파일 간 설정 불일치를 방지함.
 
-3. HTTPS 환경에서의 Mixed Content 및 CORS 이슈
+### 이슈 2: 한글 파일명 인코딩 깨짐 (Encoding Hell)
+상황: 사용자가 "평면도_최종.jpg"를 업로드하면 서버 저장소에 ì‹œí—˜.jpg와 같이 깨져서 저장됨.
 
-    현상: SSL 적용 후 프론트엔드(HTTPS)에서 백엔드(HTTP) 호출 시 보안 정책에 의해 차단됨.
+원인: HTTP 통신 시 헤더의 파일명은 기본적으로 Latin1(ISO-8859-1)으로 인코딩되지만, 서버는 이를 UTF-8로 해석하려다 발생한 문제.
 
-    해결: API 전용 서브도메인을 할당하고, NestJS main.ts에서 Dynamic Origin Whitelist 로직을 구현하여 차단된 오리진을 로그로 추적하고 실시간으로 대응했습니다.
+해결: Node.js 백엔드에서 Buffer.from(file.originalname, 'latin1').toString('utf8') 처리를 통해 바이너리 데이터를 직접 UTF-8로 재조립하여 해결.
 
-4. 실시간 통신 및 웹소켓 최적화
+### 이슈 3: 컨테이너 간 "localhost" 통신 단절
+상황: 로컬(Host) 개발 환경에선 잘 되던 백엔드가 컨테이너화 후 Redis와 DB를 찾지 못함 (ECONNREFUSED).
 
-    현상: 배포 환경에서 Socket.io 연결 시 404 Not Found 및 SSL_PROTOCOL_ERROR 발생.
+원인: 컨테이너 내부에서 localhost는 호스트 PC가 아닌 **컨테이너 자기 자신(loopback)**을 의미함.
 
-    해결: Nginx 프록시 설정에서 Websockets Support를 활성화하고, 클라이언트 측 소켓 주소에서 포트 번호를 제거하여 도메인 기반 라우팅으로 통일했습니다.
+해결: Docker Compose가 제공하는 Internal DNS 기능을 활용하여, IP 주소 대신 서비스 이름(db, redis)을 호스트네임으로 사용하도록 설정을 변경.
 
-5. 도커 컨테이너 간 "localhost" 통신 실패
+## 🛡️ 인프라 및 보안 설계 상세
+- Zero-Trust Network Architecture
+    - Internal Isolation: 데이터베이스(MySQL)와 메시지 브로커(Redis)는 외부 포트 바인딩 없이 Docker Internal Network 내에서만 통신하도록 격리하여, 외부 공격 접점(Attack Surface)을 원천 차단했습니다.
 
-    현상: 컨테이너화 이후 백엔드에서 DB 및 Redis 접속 불가 (ECONNREFUSED).
+    - Port Minimization: 호스트 머신에서는 오직 HTTP(80)와 HTTPS(443) 포트만 개방하여 보안 위협을 최소화했습니다.
 
-    원인: 컨테이너 내부에서 localhost는 자기 자신을 가리키며 호스트 PC를 가리키지 않음.
+- SSL Offloading & Reverse Proxy
+    - Nginx Proxy Manager: 모든 인바운드 트래픽을 Nginx가 먼저 받아 SSL Termination을 수행한 후, 내부 서비스로 라우팅합니다. 이를 통해 백엔드 부하를 줄이고 Let's Encrypt 인증서 갱신을 자동화했습니다.
 
-    해결: docker-compose.yml에 정의된 서비스 명(db, redis)을 호스트 네임으로 사용하여 도커 내장 DNS를 통해 통신하도록 수정했습니다.
+- Automated CI/CD Pipeline
+    - GitHub Actions Workflow:
+        - Code Push: 개발자가 Main 브랜치에 코드를 병합.
+        - Build & Test: 의존성 설치 및 유닛 테스트 자동 수행.
+        - Dockerize: 최적화된 Docker Image 빌드 후 Registry 등록.
+        - Deploy: 운영 서버(VPS)에 SSH 접속하여 무중단 배포 스크립트 실행.
+
+- Dynamic Origin Validation
+    - CORS & Origin Guard: 백엔드 미들웨어 단계에서 요청의 Origin 헤더를 동적으로 검증하여, 허용되지 않은 클라이언트의 API 접근을 로그 레벨에서 탐지하고 차단합니다.
 
 ## 📂 프로젝트 구조 (Project Structure)
-```
-.
-├── backend-api/          # NestJS 기반 API 서버 (BullMQ, Socket.io)
-├── frontend-web/         # Next.js 기반 대시보드 (Tailwind CSS)
-├── drawing-engine/       # Python 기반 OpenCV 분석 엔진
-├── npm/                  # Nginx Proxy Manager 데이터 및 인증서
-└── docker-compose.yml    # 전체 서비스 오케스트레이션 설정
-```
-
-## 📑 API 명세서 (API Documentation)
-백엔드 설계의 일관성을 위해 Swagger를 통한 자동 문서화를 적용했습니다.
-
-(이곳에 Swagger UI 메인 화면 캡처본을 작게 넣어 설계의 깔끔함을 보여주세요)MethodEndpointDescriptionPOST/drawings/upload도면 이미지 업로드 및 변환 작업 큐 등록GET/drawings/:id특정 도면의 변환 상태 및 결과 조회
-
-## 🗄️ 데이터베이스 설계 (Database Design)
-
-데이터의 일관성을 위해 Drizzle ORM을 사용하여 MySQL 스키마를 정의했습니다. 특히 status 컬럼은 Enum 타입을 사용하여 도면 변환의 비동기 작업 상태를 엄격하게 관리하도록 설계했습니다.
-
-
-```mermaid
-erDiagram
-    drawings {
-        serial id PK "Primary Key"
-        varchar file_name "NOT NULL"
-        varchar original_url "NOT NULL"
-        enum status "PENDING, PROCESSING, COMPLETED, FAILED"
-        timestamp created_at "Default: NOW()"
-    }
-```
-
-### 1. Entity Relationship Diagram (ERD)
-- **drawings**: 도면 업로드 정보, 변환 상태, 엔진 처리 결과 및 성능 지표를 통합 관리합니다.
-
-### 2. 주요 스키마 정의 (Schema Definition)
-- Strict Status Management: mysqlEnum을 사용하여 PENDING, PROCESSING, COMPLETED, FAILED 4단계 상태를 정의했습니다. 이를 통해 비동기 작업 큐(BullMQ)와 파이썬 엔진 간의 상태 동기화를 엄격하게 통제합니다.
-
-- Data Traceability: original_url 컬럼을 통해 원본 이미지의 저장 위치를 추적하며, 서버 내 물리적 경로 관리의 일관성을 유지합니다.
-
-- Time-series Tracking: createdAt에 defaultNow()를 적용하여 도면 생성 시점을 자동으로 기록, 작업 이력 추적 및 정렬의 기준점으로 활용합니다.
-
-    💡 설계 의도 (Design Choice)
-
-    - Drizzle ORM 활용: SQL과 유사한 선언적 문법을 사용하면서도 TypeScript와의 1:1 타입 매핑을 지원하여, 개발 단계에서의 런타임 에러를 방지하고 타입 안정성을 확보했습니다.
-
-    - 인코딩 최적화: MySQL 8.0 환경에서 utf8mb4 설정을 권장하여 한글 파일명 및 특수문자 처리 시 데이터 깨짐 현상을 방지하도록 설계했습니다.
-
-### 데이터 타입 선택 이유
-
-현재는 도면의 메타데이터 관리에 집중하고 있으며, 향후 추출된 좌표 데이터의 대용량 처리를 위해 JSON 또는 TEXT 타입을 도입하여 가변적인 데이터 크기에 유연하게 대응할 계획입니다.
-
-### 테이블 확장 계획
-
-향후 users 테이블을 추가하여 1:N 관계의 사용자별 도면 이력 관리 기능을 구현하고, 변환 성능 최적화를 위한 process_time 컬럼을 추가하여 모니터링 시스템을 고도화할 예정입니다.
-
-## 🚀 시작하기 (Getting Started)
-
-프로젝트는 **Docker Compose**를 통해 모든 마이크로서비스 인프라를 한 번에 가동할 수 있도록 설계되었습니다.
-
-### 1. 환경 변수 설정
-각 서비스 폴더 내의 `.env.example` 파일을 복사하여 실제 환경 변수 파일을 생성합니다.
 ```bash
-# 루트 디렉토리에서 실행
-cp backend-api/.env.example backend-api/.env
-cp drawing-engine/.env.example drawing-engine/.env
-cp frontend-web/.env.example frontend-web/.env.local
+.
+├── backend-api/          # NestJS (API, WebSocket, Queue Producer)
+│   ├── src/db/           # Drizzle ORM Schema & Config
+│   └── src/drawings/     # 도면 처리 비즈니스 로직
+├── drawing-engine/       # Python (Consumer, OpenCV, Gemini Client)
+├── frontend-web/         # Next.js (Dashboard, UI)
+├── npm/                  # Nginx Proxy Manager Data
+└── docker-compose.yml    # 인프라 정의서
 ```
-
-### 2. 전체 서비스 실행 (Docker)
-Docker Compose를 사용하여 DB, Redis, Backend, Engine, Frontend, Nginx Proxy Manager를 한 번에 실행합니다.
-
-```Bash
-# 전체 컨테이너 빌드 및 백그라운드 실행
-docker-compose up -d --build
-```
-
-### 3. 초기 데이터베이스 설정
-백엔드 컨테이너가 가동되면 Drizzle ORM을 통해 스키마를 동기화합니다.
-
-```Bash
-docker exec -it drawing-service-backend npx drizzle-kit push
-```
-
-### 4. 접속 주소 확인
-Frontend Dashboard: https://quitelog.com (또는 로컬 http://localhost:3001)
-
-API Swagger: https://api.quitelog.com/api (또는 로컬 http://localhost:3000/api)
-
-Nginx Proxy Admin: http://localhost:81
 
 ---
 
+## 🚀 핵심 기술 성과 (Key Achievements)
+
+### 1. Python과 NestJS의 장점만 결합한 AI 엔진 최적화
+- **문제 해결**: 처음에는 Python 하나로 모든 걸 처리하려니 서버 반응이 느려졌고, NestJS만 쓰자니 이미지 처리가 버거웠습니다.
+- **해결 전략**:
+    - **Python(OpenCV)**: 힘이 많이 드는 이미지 노이즈 제거와 이진화 작업만 전담시켜 처리 속도를 높였습니다.
+    - **NestJS(AI 제어)**: 전처리된 이미지를 받아 **Gemini 3 Flash**와 통신하고, 결과를 DB에 저장하는 역할을 맡겼습니다.
+- **성과**: 이 구조를 통해 기존 OpenCV 방식으로는 불가능했던 **손글씨 치수 인식**과 **복잡한 기호 분류**를 성공시켰고, 인식 정확도를 끌어올렸습니다.
+
+### 2. 사용자를 기다리게 하지 않는 '실시간' 경험 구현
+- **문제 해결**: 고해상도 도면을 변환하는 데 수십 초가 걸리다 보니, 사용자가 "멈춘 건가?" 하고 새로고침을 누르는 문제가 있었습니다.
+- **해결 전략**:
+    - 오래 걸리는 작업은 **Redis Queue(BullMQ)**에 넣어 백그라운드에서 처리하게 만들었습니다.
+    - 작업이 끝나면 **Socket.io**가 브라우저에 "완료되었습니다!"라고 즉시 알려주도록 구현했습니다.
+- **성과**: 사용자는 변환 중에도 대시보드의 다른 기능을 자유롭게 쓸 수 있게 되었고, 불필요한 새로고침(Polling) 트래픽을 없애 **서버 부하를 대폭 줄였습니다.**
+
+### 3. 배포와 보안까지 고려한 자동화 시스템
+- **자동화(CI/CD)**: 코드를 수정하고 서버에 올리는 과정이 번거로워, **GitHub Actions**와 **Docker**를 연동했습니다. 이제 코드를 푸시(Push)하기만 하면 테스트부터 배포까지 알아서 진행됩니다.
+- **보안(Security)**: DB나 Redis 같은 중요한 데이터 저장소는 외부에서 절대 접근할 수 없도록 **내부망(Internal Network)**에 숨기고, 오직 Nginx를 통해서만 안전하게 접속되도록 설계했습니다.
+
 ## 📅 향후 개선 과제 (Roadmap)
-- AI 고도화: 변환 정확도 향상을 위한 딥러닝 기반 선 검출 모델 통합.
-
-- 편집 도구 확장: 웹상에서 변환된 벡터 데이터를 직접 수정할 수 있는 Canvas 편집 기능 추가.
-
-- CI/CD 자동화: GitHub Actions를 활용한 자동 빌드 및 배포 파이프라인 구축.
+- AI 모델 파인튜닝: 도면 데이터셋 학습을 통해 인식 정확도 개선이 필요
