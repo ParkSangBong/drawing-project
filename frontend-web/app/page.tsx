@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -150,6 +151,15 @@ export default function Home() {
 
   return (
     <main style={{ padding: '2rem', maxWidth: '1100px', margin: '0 auto' }}>
+      {/* 내비게이션 추가 */}
+      <nav style={{ marginBottom: '2rem', display: 'flex', gap: '20px', borderBottom: '1px solid #333', paddingBottom: '1rem' }}>
+        <Link href="/" style={{ color: '#4facfe', fontWeight: 'bold', textDecoration: 'none', borderBottom: '2px solid #4facfe' }}>
+          🛠️ 레거시 엔진 (OpenCV)
+        </Link>
+        <Link href="/ai" style={{ color: '#888', textDecoration: 'none' }}>
+          🚀 차세대 AI 엔진 (Gemini)
+        </Link>
+      </nav>
       <style jsx>{`
         .spinner { width: 12px; height: 12px; border: 2px solid #f39c12; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -159,7 +169,7 @@ export default function Home() {
         tr:hover { background-color: #222; }
       `}</style>
 
-      <h1>🎨 내 도면 변환 대시보드</h1>
+      <h1>🎨 도면 변환 대시보드</h1>
       
       {/* 1. 업로드 섹션 */}
       <div style={{ marginBottom: '2rem', border: '1px solid #444', padding: '2rem', borderRadius: '12px', backgroundColor: '#1a1a1a', textAlign: 'center' }}>
