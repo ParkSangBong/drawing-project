@@ -10,54 +10,68 @@ jobs:
 
     defaults:
       run:
-        shell: wsl -u root {0}
+        shell: powershell
 
     steps:
       - name: 코드 내려받기 (Checkout)
         uses: actions/checkout@v3
 
-      # --------------------------------------------------------
-      # -------------------------------------------------------
-      - name: Create .env files inside WSL
+      - name: Create Root .env
         run: |
-          # 루트 .env
-          echo "DB_NAME=${{ secrets.DB_NAME }}" > .env
-          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "DB_ROOT_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env
-          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env
-          echo "BACKEND_PORT=${{ secrets.PORT }}" >> .env
-          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env
-          echo "TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}" >> .env
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          $content = @"
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_ROOT_PASSWORD=${{ secrets.DB_PASSWORD }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          BACKEND_PORT=${{ secrets.PORT }}
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          "@
+          Set-Content -Path ".env" -Value $content -Encoding UTF8
 
-          # 백엔드 .env
-          echo "PORT=${{ secrets.PORT }}" > backend-api/.env
-          echo "NODE_ENV=production" >> backend-api/.env
-          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> backend-api/.env
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> backend-api/.env
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> backend-api/.env
-          echo "DB_USER=${{ secrets.DB_USER }}" >> backend-api/.env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> backend-api/.env
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> backend-api/.env
-          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> backend-api/.env
-          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> backend-api/.env
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> backend-api/.env
-
-          # 프론트엔드 .env
-          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" > frontend-web/.env.local
-
-          # 그림 엔진 .env
-          echo "REDIS_URL=redis://${{ secrets.REDIS_HOST }}:${{ secrets.REDIS_PORT }}" > drawing-engine/.env
-          echo "BACKEND_API_PATH=/app/backend-api" >> drawing-engine/.env
-          echo "TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}" >> drawing-engine/.env
-
-      # --------------------------------------------------------
-      # --------------------------------------------------------
-      - name: Run Docker Compose
-        # docker-compose는 윈도우 실행파일(.exe)을 호출해야 경로 문제가 덜 생깁니다.
-        shell: cmd
+      - name: Create Backend .env
         run: |
-          docker-compose down --remove-orphans
-          docker-compose up -d --build
+          $content = @"
+          PORT=${{ secrets.PORT }}
+          NODE_ENV=production
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          "@
+          Set-Content -Path "backend-api/.env" -Value $content -Encoding UTF8
+
+      - name: Create Frontend .env
+        run: |
+          $content = @"
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          "@
+          Set-Content -Path "frontend-web/.env.local" -Value $content -Encoding UTF8
+
+      - name: Create Engine .env
+        run: |
+          $content = @"
+          REDIS_URL=redis://${{ secrets.REDIS_HOST }}:${{ secrets.REDIS_PORT }}
+          BACKEND_API_PATH=/app/backend-api
+          TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}
+          "@
+          Set-Content -Path "drawing-engine/.env" -Value $content -Encoding UTF8
+
+      - name: Run Docker Compose via WSL
+        run: |
+          # 윈도우 PowerShell에서 'wsl' 명령어를 통해 리눅스에게 작업을 시킵니다.
+          # 이렇게 하면 경로 꼬임 문제 없이 WSL 환경을 그대로 쓸 수 있습니다.
+          
+          Write-Host "Shutting down existing containers via WSL..."
+          wsl docker-compose down --remove-orphans
+          
+          Write-Host "Building and starting containers via WSL..."
+          wsl docker-compose up -d --build
