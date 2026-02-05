@@ -30,7 +30,10 @@ jobs:
           TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           "@
-          Set-Content -Path ".env" -Value $content -Encoding UTF8
+          
+          # [중요] BOM(서명) 없는 UTF-8로 강제 저장하는 .NET 명령어입니다.
+          $enc = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText(".env", $content, $enc)
 
       - name: Create Backend .env
         run: |
@@ -47,14 +50,18 @@ jobs:
           REDIS_PORT=${{ secrets.REDIS_PORT }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           "@
-          Set-Content -Path "backend-api/.env" -Value $content -Encoding UTF8
+          
+          $enc = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText("backend-api/.env", $content, $enc)
 
       - name: Create Frontend .env
         run: |
           $content = @"
           NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
           "@
-          Set-Content -Path "frontend-web/.env.local" -Value $content -Encoding UTF8
+          
+          $enc = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText("frontend-web/.env.local", $content, $enc)
 
       - name: Create Engine .env
         run: |
@@ -63,13 +70,12 @@ jobs:
           BACKEND_API_PATH=/app/backend-api
           TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}
           "@
-          Set-Content -Path "drawing-engine/.env" -Value $content -Encoding UTF8
+          
+          $enc = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText("drawing-engine/.env", $content, $enc)
 
       - name: Run Docker Compose via WSL
         run: |
-          # 윈도우 PowerShell에서 'wsl' 명령어를 통해 리눅스에게 작업을 시킵니다.
-          # 이렇게 하면 경로 꼬임 문제 없이 WSL 환경을 그대로 쓸 수 있습니다.
-          
           Write-Host "Shutting down existing containers via WSL..."
           wsl docker-compose down --remove-orphans
           
