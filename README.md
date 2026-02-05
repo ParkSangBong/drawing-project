@@ -42,7 +42,7 @@
 
 | Category | Technology | Usage |
 | :--- | :--- | :--- |
-| **Frontend** | **Next.js 15, TypeScript** | App Router 기반의 대시보드 및 실시간 미리보기 UI |
+| **Frontend** | **Next.js , TypeScript** | App Router 기반의 대시보드 및 실시간 미리보기 UI |
 | **Backend** | **NestJS** | REST API, Gemini API 연동, BullMQ(큐) 관리, Socket.io |
 | **Engine** | **Python 3.11** | OpenCV 기반 이미지 전처리 (노이즈 제거, 이진화) |
 | **Database** | **MySQL 8.0** | 사용자 데이터 및 도면 메타데이터 저장 (Drizzle ORM 사용) |
