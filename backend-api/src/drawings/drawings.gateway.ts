@@ -5,6 +5,7 @@ import {
     OnGatewayDisconnect,
     MessageBody,
     SubscribeMessage,
+    ConnectedSocket,
   } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { DrawingsService } from './drawings.service';
@@ -65,7 +66,7 @@ import { forwardRef, Inject } from '@nestjs/common';
     // }
 
     @SubscribeMessage('adjustParameters')
-    async handleAdjustParameters(client: Socket, @MessageBody() data: any) {
+    async handleAdjustParameters(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
       // client.id가 바로 현재 접속한 유저의 고유 주소입니다.
       console.info(`📥 수신된 파라미터 (유저: ${client.id}):`, data);
 
