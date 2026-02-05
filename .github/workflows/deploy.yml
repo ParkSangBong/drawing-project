@@ -1,0 +1,76 @@
+name: Deploy Full Stack to Windows Desktop
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: 코드 내려받기 (Checkout)
+        uses: actions/checkout@v3
+
+      # --------------------------------------------------------
+      # 1. 최상위 디렉토리 .env 생성 (Docker Compose용)
+      # --------------------------------------------------------
+      - name: Root .env 생성
+        run: |
+          echo "DB_NAME=${{ secrets.DB_NAME }}" > .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_ROOT_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env
+          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env
+          echo "BACKEND_PORT=${{ secrets.PORT }}" >> .env
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env
+          echo "TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+        shell: bash
+
+      # --------------------------------------------------------
+      # 2. 백엔드 (.env) 생성
+      # --------------------------------------------------------
+      - name: Backend .env 생성
+        run: |
+          echo "PORT=${{ secrets.PORT }}" > backend-api/.env
+          echo "NODE_ENV=production" >> backend-api/.env
+          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> backend-api/.env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> backend-api/.env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> backend-api/.env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> backend-api/.env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> backend-api/.env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> backend-api/.env
+          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> backend-api/.env
+          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> backend-api/.env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> backend-api/.env
+        shell: bash
+
+      # --------------------------------------------------------
+      # 3. 프론트엔드 (.env) 생성
+      # --------------------------------------------------------
+      - name: Frontend .env 생성
+        run: |
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" > frontend-web/.env
+        shell: bash
+
+      # --------------------------------------------------------
+      # 4. 그림 엔진 (.env) 생성
+      # --------------------------------------------------------
+      - name: Drawing Engine .env 생성
+        run: |
+          # Redis URL은 호스트와 포트를 조합해서 만듭니다
+          echo "REDIS_URL=redis://${{ secrets.REDIS_HOST }}:${{ secrets.REDIS_PORT }}" > drawing-engine/.env
+          # 백엔드 경로는 도커 내부 경로이므로 고정값 사용 (필요시 Secrets로 변경 가능)
+          echo "BACKEND_API_PATH=/app/backend-api" >> drawing-engine/.env
+          echo "TESSERACT_PATH=${{ secrets.TESSERACT_PATH }}" >> drawing-engine/.env
+        shell: bash
+
+      # --------------------------------------------------------
+      # 5. 전체 서비스 실행 (Docker Compose)
+      # --------------------------------------------------------
+      - name: 전체 서비스 실행
+        run: |
+          docker-compose down --remove-orphans
+          docker-compose up -d --build
