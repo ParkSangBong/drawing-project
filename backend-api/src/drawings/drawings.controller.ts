@@ -41,6 +41,7 @@ export class DrawingsController {
       type: 'object', properties: { 
         file: { type: 'string', format: 'binary' },
         fileName: { type: 'string', example: 'my_drawing' }, 
+        socketId: { type: 'string', example: 'abc-123' },
       },
     },
   })
@@ -56,12 +57,12 @@ export class DrawingsController {
       }),
     }),
   )
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Body() dto: CreateDrawingDto) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @Body() dto: CreateDrawingDto, @Body('socketId') socketId: string) {
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     
     console.log('디코딩된 파일명:', originalName); 
 
-    return this.drawingsService.create(originalName, file.path);
+    return this.drawingsService.create(originalName, file.path, socketId);
   }
 
   @Get()

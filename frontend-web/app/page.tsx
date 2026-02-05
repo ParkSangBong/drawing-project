@@ -99,6 +99,11 @@ export default function Home() {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
+    
+    if (socket?.id) {
+        formData.append('socketId', socket.id);
+    }
+    
     try {
       const res = await axios.post(`${API_URL}/drawings/upload`, formData);
       const newId = res.data.drawingId; 

@@ -253,7 +253,7 @@ export class DrawingsService {
     }
   }
 
-  async create(fileName: string, filePath: string) {
+  async create(fileName: string, filePath: string, socketId: string) {
     const result = await this.drizzle.db.insert(drawings).values({
       fileName: fileName,
       originalUrl: filePath,
@@ -270,6 +270,7 @@ export class DrawingsService {
         drawingId: drawingId,
         filePath: filePath,
         startTime,
+        socketId: socketId,
       });
       this.logger.log(`✅ Job added to Redis successfully! Job ID: ${job.id}`);
     } catch (error) {
