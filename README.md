@@ -26,11 +26,33 @@
 
 ### 2. V1: OpenCV 기반 엔진 (Legacy)
 초기에는 컴퓨터 비전 기술(OpenCV)을 활용하여 이미지의 경계선(Edge)을 따는 방식을 시도했습니다.
+
+<details>
+  <summary>📉 <b>V1 실패 사례 보기 (Click to Expand)</b></summary>
+  <br/>
+  <div align="center">
+    <img src="https://github.com/user-attachments/assets/db8cbc1d-4472-486e-b5b7-89d184c95c3b" width="45%" alt="V1 한계 1">
+    <img src="https://github.com/user-attachments/assets/c55c64aa-b536-4616-8817-f1f42aeb9f1d" width="45%" alt="V1 한계 2">
+    <p><i>▲ 노이즈와 텍스트를 구분하지 못하고 데이터가 훼손된 모습</i></p>
+  </div>
+</details>
+
 - **방식**: Canny Edge Detection & Adaptive Thresholding 적용.
 - **한계**: 도면의 얼룩이나 그림자(노이즈)를 벽체로 오인하거나, 손글씨로 적힌 치수(Text)를 선으로 인식하여 데이터가 훼손되는 문제가 발생했습니다.
 
 ### 3. V2: Generative AI 도입 (Current)
 단순한 기하학적 계산을 넘어, 도면의 **맥락(Context)**을 이해하기 위해 **Google Gemini 3 Flash**를 도입했습니다.
+
+<details>
+  <summary>🚀 <b>V2 개선 결과 보기 (Click to Expand)</b></summary>
+  <br/>
+  <div align="center">
+    <img src="https://github.com/user-attachments/assets/c60a2256-341c-4fe0-bbeb-4ed0bc764397" width="45%" alt="V2 개선 1">
+    <img src="https://github.com/user-attachments/assets/26e20263-ddab-410c-b1a8-e4ae3205c45b" width="45%" alt="V2 개선 2">
+    <p><i>▲ 벽체, 창문, 텍스트를 정확히 구분하여 벡터 데이터 변환에 성공한 모습</i></p>
+  </div>
+</details>
+
 - **개선점**: AI가 벽체, 창문, 텍스트를 구분하여 인식하므로 노이즈에 강하며, 손글씨 치수까지 디지털 텍스트로 변환이 가능해졌습니다.
 - **하이브리드 아키텍처 (Hybrid Pipeline)**:
     - **Python (OpenCV)**: CPU 연산이 필요한 이미지 전처리(노이즈 제거, 이진화)를 전담하여 처리 속도 확보.
