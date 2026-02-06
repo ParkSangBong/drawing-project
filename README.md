@@ -38,7 +38,7 @@
 </details>
 
 - **방식**: Canny Edge Detection & Adaptive Thresholding 적용.
-- **한계**: 도면의 얼룩이나 그림자(노이즈)를 벽체로 오인하거나, 손글씨로 적힌 치수(Text)를 선으로 인식하여 데이터가 훼손되는 문제가 발생했습니다.
+- **한계**: 도면의 얼룩이나 그림자(노이즈)를 오인하거나, 손글씨로 적힌 치수(Text)를 선으로 인식하여 데이터가 훼손되는 문제가 발생했습니다.
 
 ### 3. V2: Generative AI 도입 (Current)
 단순한 기하학적 계산을 넘어, 도면의 **맥락(Context)**을 이해하기 위해 **Google Gemini 3 Flash**를 도입했습니다.
@@ -49,11 +49,11 @@
   <div align="center">
     <img src="https://github.com/user-attachments/assets/c60a2256-341c-4fe0-bbeb-4ed0bc764397" width="45%" alt="V2 개선 1">
     <img src="https://github.com/user-attachments/assets/26e20263-ddab-410c-b1a8-e4ae3205c45b" width="45%" alt="V2 개선 2">
-    <p><i>▲ 벽체, 창문, 텍스트를 정확히 구분하여 벡터 데이터 변환에 성공한 모습</i></p>
+    <p><i>▲ 노이즈, 텍스트를 정확히 구분하여 벡터 데이터 변환에 성공한 모습</i></p>
   </div>
 </details>
 
-- **개선점**: AI가 벽체, 창문, 텍스트를 구분하여 인식하므로 노이즈에 강하며, 손글씨 치수까지 디지털 텍스트로 변환이 가능해졌습니다.
+- **개선점**: AI가 노이즈, 텍스트를 구분하여 인식하므로 노이즈에 강하며, 손글씨 치수까지 디지털 텍스트로 변환이 가능해졌습니다.
 - **하이브리드 아키텍처 (Hybrid Pipeline)**:
     - **Python (OpenCV)**: CPU 연산이 필요한 이미지 전처리(노이즈 제거, 이진화)를 전담하여 처리 속도 확보.
     - **NestJS (AI Orchestration)**: 전처리된 이미지를 Gemini API로 전송하고 결과를 파싱하여 DB에 저장.
