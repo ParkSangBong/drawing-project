@@ -45,7 +45,8 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./backend-api/uploads:/app/uploads
+      # - ./backend-api/uploads:/app/uploads
+      - shared_uploads:/app/uploads
 
   # 🚀 추가: 파이썬 이미지 엔진
   engine:
@@ -61,7 +62,8 @@ services:
     depends_on:
       - redis
     volumes:
-      - ./backend-api/uploads:/app/backend-api/uploads
+      # - ./backend-api/uploads:/app/backend-api/uploads
+      - shared_uploads:/app/backend-api/uploads
 
   # 🚀 추가: 프론트엔드 웹
   frontend:
@@ -93,5 +95,6 @@ services:
 
 volumes:
   db_data:
+  shared_uploads:
 
 
