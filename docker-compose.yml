@@ -9,6 +9,7 @@ services:
     container_name: drawing-service-mysql
     restart: always
     environment:
+      TZ: Asia/Seoul
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
@@ -34,6 +35,7 @@ services:
       - "3000:3000"
     env_file: ./backend-api/.env
     environment:
+      - TZ=Asia/Seoul
       - DB_HOST=db
       - REDIS_HOST=redis
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -52,6 +54,7 @@ services:
     restart: always
     env_file: ./drawing-engine/.env
     environment:
+      - TZ=Asia/Seoul
       - REDIS_URL=redis://redis:6379
       - BACKEND_API_PATH=/app/backend-api
       - PYTHONUNBUFFERED=1
