@@ -72,7 +72,7 @@ export class DrawingsService {
   // 🚀 [FINAL] Gemini 3 AI 변환 로직 (Smart Tracing Mode)
   // =================================================================
 
-  async convertWithGemini(file: Express.Multer.File): Promise<any> {
+  async convertWithGemini(file: Express.Multer.File, socketId?: string): Promise<any> {
     try {
       this.logger.log('🤖 Gemini 3 AI 분석 시작 (Smart Tracing Mode)...');
       
@@ -95,12 +95,25 @@ export class DrawingsService {
       fs.writeFileSync(uploadPath, dxfContent);
       this.logger.log(`💾 DXF 파일 저장 완료: ${fileName}`);
       
-      return {
+      const resultData = {
         success: true,
         message: '변환 성공',
-        dxfUrl: `/uploads/${fileName}`,
-        aiData: designData // 프론트엔드 확인용
+        dxfUrl: `/uploads/${fileName}`, // 클라이언트가 접근할 URL
+        aiData: designData
       };
+
+      if (socketId) {
+        this.logger.log(`📡 [Socket] ${socketId}에게 변환 완료 신호 전송`);
+        
+        this.drawingsGateway.server.to(socketId).emit('previewReady', {
+            previewUrl: `/uploads/${fileName}`,
+            extractedDimensions: designData.elements
+              .filter(el => el.type === 'TEXT') // 텍스트만 추려서 보냄 (선택사항)
+              .map(el => (el as any).content) 
+        });
+      }
+
+      return resultData;
 
     } catch (error) {
       this.logger.error(`❌ AI 변환 실패: ${error}`);

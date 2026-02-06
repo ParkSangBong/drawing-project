@@ -20,13 +20,13 @@ export class DrawingsController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
-      type: 'object', properties: { file: { type: 'string', format: 'binary' } },
+      type: 'object', properties: { file: { type: 'string', format: 'binary' }, socketId: { type: 'string', example: 'abc-123' } },
     },
   })
   @UseInterceptors(FileInterceptor('file')) // 메모리에 파일 임시 저장 (DiskStorage 안 씀)
-  async convertWithAi(@UploadedFile() file: Express.Multer.File) {
+  async convertWithAi(@UploadedFile() file: Express.Multer.File, @Body('socketId') socketId: string) {
     // 바로 서비스 호출
-    return this.drawingsService.convertWithGemini(file);
+    return this.drawingsService.convertWithGemini(file, socketId);
   }
 
   // =================================================================
