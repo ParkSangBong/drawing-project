@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quite Log, 조용한 포트폴리오",
-  description: "",
+  title: "Draw2CAD | 손그림 도면을 CAD로",
+  description: "손으로 그린 도면을 사진 한 장으로 CAD 파일로 변환합니다.",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ko">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
