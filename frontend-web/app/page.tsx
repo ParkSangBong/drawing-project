@@ -69,8 +69,9 @@ export default function Home() {
 
     newSocket.on('previewReady', (data: { previewUrl: string, extractedDimensions?: string[] }) => {
       console.log('🖼️ 미리보기 및 수신 데이터:', data);
-      // 🚀 [수정] 환경 변수 적용
-      const fullUrl = `${API_URL}/${data.previewUrl}?t=${Date.now()}`;
+      // previewUrl은 "/uploads/..." 형태이므로 사이에 슬래시를 넣지 않는다.
+      // 슬래시를 더하면 "//uploads"가 되어 정적 파일을 찾지 못한다.
+      const fullUrl = `${API_URL}${data.previewUrl}?t=${Date.now()}`;
       setProcessedPreview(fullUrl);
       
       // 서버에서 수치 리스트가 오면 상태 업데이트

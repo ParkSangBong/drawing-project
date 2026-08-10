@@ -26,8 +26,10 @@ export default function AiPage() {
       setIsLoading(false);
       
       setResult({
-        dxfUrl: `${API_URL}/${data.previewUrl}`, // URL 경로 보정
-        aiData: { elements: data.extractedDimensions || [] } 
+        // previewUrl은 "/uploads/..." 처럼 슬래시로 시작하므로
+        // API_URL 뒤에 그대로 붙인다. 사이에 슬래시를 더하면 "//uploads"가 되어 404가 난다.
+        dxfUrl: `${API_URL}${data.previewUrl}`,
+        aiData: { elements: data.extractedDimensions || [] }
       });
       
       alert('AI 변환이 완료되었습니다! 🎉');
